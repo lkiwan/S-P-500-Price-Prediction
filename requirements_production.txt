@@ -1,0 +1,13 @@
+# Production requirements for S&P 500 AI Prediction Dashboard
+
+# Web Server
+gunicorn==21.2.0
+gevent==23.9.1
+
+# Security
+flask-talisman==1.1.0
+flask-limiter==3.5.0
+python-dotenv==1.0.0
+
+# Monitoring
+prometheus-flask-exporter==0.23.0

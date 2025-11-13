@@ -1215,6 +1215,153 @@ def get_economic_calendar():
         return jsonify({'success': False, 'error': str(e)})
 
 
+@app.route('/api/backtest_strategies')
+def backtest_strategies():
+    """Run backtesting on multiple strategies"""
+    try:
+        from src.models.backtester import Backtester
+
+        # Load predictions and prices
+        if not os.path.exists(PREDICTIONS_FILE) or not os.path.exists(PRICE_FILE):
+            return jsonify({'success': False, 'message': 'Required data not found'})
+
+        pred_df = pd.read_csv(PREDICTIONS_FILE)
+        price_df = pd.read_csv(PRICE_FILE)
+
+        # Initialize backtester
+        backtester = Backtester(initial_capital=10000, commission=0.001)
+
+        # Compare strategies
+        results = backtester.compare_strategies(pred_df, price_df)
+
+        # Format results for frontend
+        formatted_results = {}
+        for strategy_name, result in results.items():
+            formatted_results[strategy_name] = {
+                'total_return_pct': result['total_return_pct'],
+                'final_capital': result['final_capital'],
+                'sharpe_ratio': result['sharpe_ratio'],
+                'max_drawdown_pct': result['max_drawdown_pct'],
+                'win_rate_pct': result['win_rate_pct'],
+                'profit_factor': result['profit_factor'],
+                'total_trades': result['total_trades'],
+                'winning_trades': result['winning_trades'],
+                'losing_trades': result['losing_trades'],
+                'avg_win_pct': result['avg_win_pct'],
+                'avg_loss_pct': result['avg_loss_pct']
+            }
+
+            # Include equity curve (last 100 points for performance)
+            if 'equity_curve' in result and len(result['equity_curve']) > 0:
+                equity_curve = result['equity_curve'][-100:]
+                formatted_results[strategy_name]['equity_curve'] = [
+                    {'date': e['date'].strftime('%Y-%m-%d') if hasattr(e['date'], 'strftime') else str(e['date']),
+                     'capital': e['capital'],
+                     'return': e['return']}
+                    for e in equity_curve
+                ]
+
+        return jsonify({
+            'success': True,
+            'strategies': formatted_results,
+            'initial_capital': 10000
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/monte_carlo')
+def monte_carlo_simulation():
+    """Run Monte Carlo simulation"""
+    try:
+        import numpy as np
+        from src.models.monte_carlo import MonteCarloSimulator
+
+        # Get parameters from query string
+        days = int(request.args.get('days', 30))
+        num_simulations = int(request.args.get('simulations', 1000))
+
+        # Load price data
+        if not os.path.exists(PRICE_FILE):
+            return jsonify({'success': False, 'message': 'Price data not found'})
+
+        price_df = pd.read_csv(PRICE_FILE)
+
+        # Initialize simulator
+        simulator = MonteCarloSimulator(price_df)
+
+        # Run simulation (but only return summary, not all paths for performance)
+        result = simulator.simulate_price_paths(days=days, num_simulations=num_simulations)
+
+        # Remove full simulations array (too large for JSON)
+        # Only keep summary statistics
+        result_summary = {
+            'current_price': result['current_price'],
+            'days': result['days'],
+            'num_simulations': result['num_simulations'],
+            'final_price_stats': result['final_price_stats'],
+            'percentiles': result['percentiles'],
+            'prob_profit_pct': result['prob_profit_pct'],
+            'expected_return_pct': result['expected_return_pct'],
+            'var_95_pct': result['var_95_pct'],
+            'cvar_95_pct': result['cvar_95_pct'],
+            'daily_stats': result['daily_stats'],
+            'historical_stats': result['historical_stats']
+        }
+
+        # Add sample paths for visualization (only 50 paths)
+        sample_paths = np.array(result['simulations'])[:50].tolist()
+        result_summary['sample_paths'] = sample_paths
+
+        return jsonify({
+            'success': True,
+            **result_summary
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/monte_carlo_scenarios')
+def monte_carlo_scenarios():
+    """Run Monte Carlo scenario analysis (Bull/Base/Bear)"""
+    try:
+        from src.models.monte_carlo import MonteCarloSimulator
+
+        # Load price data
+        if not os.path.exists(PRICE_FILE):
+            return jsonify({'success': False, 'message': 'Price data not found'})
+
+        price_df = pd.read_csv(PRICE_FILE)
+
+        # Initialize simulator
+        simulator = MonteCarloSimulator(price_df)
+
+        # Run scenario analysis
+        scenarios = simulator.run_scenario_analysis()
+
+        # Format results
+        formatted_scenarios = {}
+        for scenario_name, result in scenarios.items():
+            formatted_scenarios[scenario_name] = {
+                'current_price': result['current_price'],
+                'final_price_stats': result['final_price_stats'],
+                'percentiles': result['percentiles'],
+                'prob_profit_pct': result['prob_profit_pct'],
+                'expected_return_pct': result['expected_return_pct'],
+                'var_95_pct': result['var_95_pct']
+            }
+
+        return jsonify({
+            'success': True,
+            'scenarios': formatted_scenarios
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
 @app.route('/api/export_pdf')
 def export_pdf():
     """Generate and export PDF report"""
