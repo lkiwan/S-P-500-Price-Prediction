@@ -1,0 +1,120 @@
+# S&P 500 Price Prediction Configuration
+
+# Data Settings
+data:
+  ticker: "^GSPC" # S&P 500 Index
+  start_date: "2020-01-01"
+  end_date: null # null = today
+  train_test_split: 0.8
+
+# Paths
+paths:
+  raw_data: "data/raw"
+  processed_data: "data/processed"
+  features: "data/features"
+  models: "models"
+  news_file: "all news.md"
+
+# News Collection
+news:
+  sources:
+    - "finviz"
+    - "yahoo_finance"
+    - "newsapi"
+  # NewsAPI key (get free key from newsapi.org)
+  newsapi_key: "YOUR_API_KEY_HERE"
+  max_articles_per_day: 50
+
+# Economic Data APIs
+economic_data:
+  # FRED API key (get free key from https://fred.stlouisfed.org/docs/api/api_key.html)
+  fred_api_key: "41b6f35db23fb89a5592c0dca803b4f7"
+  # BEA API key (get free key from https://www.bea.gov/developers/)
+  bea_api_key: "89399087-EB89-48DC-9A6D-1817723D119A"
+  # BLS API key (optional - get from https://www.bls.gov/developers/)
+  bls_api_key: null
+  # Trading Economics API key (get from https://developer.tradingeconomics.com/)
+  trading_economics_key: null
+
+  # Economic indicators to fetch
+  use_economic_data: true
+  indicators:
+    - "fed_funds_rate"
+    - "unemployment_rate"
+    - "inflation_rate"
+    - "vix"
+    - "treasury_yields"
+    - "yield_curve"
+    - "dollar_index"
+    - "oil_price"
+    - "consumer_sentiment"
+
+# Sentiment Analysis
+sentiment:
+  model: "ProsusAI/finbert" # FinBERT for financial sentiment
+  batch_size: 32
+  max_length: 512
+  use_cuda: false
+  aggregation: "weighted_mean" # mean, weighted_mean, or max
+
+# Technical Indicators
+technical:
+  indicators:
+    - "SMA_20"
+    - "SMA_50"
+    - "EMA_12"
+    - "RSI_14"
+    - "MACD"
+    - "BB_upper"
+    - "BB_lower"
+    - "Volume_ratio"
+
+# Feature Engineering
+features:
+  sentiment_lag_days: [0, 1, 2, 3] # Use sentiment from past N days
+  price_lag_days: [1, 2, 3, 5]
+  rolling_windows: [5, 10, 20]
+
+# Model Settings
+model:
+  type: "xgboost" # xgboost, lightgbm, random_forest, or ensemble
+  task: "classification" # classification (up/down) or regression (price)
+
+  # XGBoost parameters
+  xgboost:
+    n_estimators: 200
+    max_depth: 6
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    objective: "binary:logistic"
+    eval_metric: "auc"
+    early_stopping_rounds: null
+
+  # Random Forest parameters
+  random_forest:
+    n_estimators: 200
+    max_depth: 10
+    min_samples_split: 5
+    min_samples_leaf: 2
+
+# Training Settings
+training:
+  validation_split: 0.2
+  random_state: 42
+  cross_validation_folds: 5
+
+# Prediction Settings
+prediction:
+  threshold: 0.5 # Probability threshold for classification
+  confidence_level: 0.7 # Minimum confidence to make a prediction
+
+# Evaluation Metrics
+evaluation:
+  metrics:
+    - "accuracy"
+    - "precision"
+    - "recall"
+    - "f1_score"
+    - "auc_roc"
+    - "confusion_matrix"

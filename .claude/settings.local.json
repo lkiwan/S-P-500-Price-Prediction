@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(mkdir:*)",
+      "Bash(src__init__.py)",
+      "Bash(srcdata_collection__init__.py)",
+      "Bash(srcpreprocessing__init__.py)",
+      "Bash(srcfeatures__init__.py)",
+      "Bash(srcmodels__init__.py)",
+      "Bash(srcutils__init__.py)",
+      "Bash(find:*)",
+      "Bash(pip install:*)",
+      "Bash(python -c:*)",
+      "Bash(python run_simple.py:*)",
+      "Bash(python analyze_results.py:*)",
+      "Bash(python predict_tomorrow.py:*)",
+      "Bash(python:*)",
+      "Bash(dir:*)",
+      "Bash(curl:*)",
+      "Bash(git init:*)",
+      "Bash(git config:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

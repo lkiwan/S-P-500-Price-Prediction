@@ -1,0 +1,70 @@
+
+======================================================================
+S&P 500 PRICE PREDICTION - ANALYSIS REPORT
+======================================================================
+Generated: 2025-11-13 20:59:47
+
+DATA OVERVIEW
+======================================================================
+Total Days: 1475
+Date Range: 2020-01-02 to 2025-11-12
+Training Samples: 1275
+
+PRICE STATISTICS
+======================================================================
+Starting Price: $3257.85
+Ending Price: $6850.92
+Total Return: 110.29%
+Average Daily Return: 0.0593%
+Daily Volatility (Std): 1.3283%
+Sharpe Ratio (approx): 0.71
+
+Best Day: 9.52% on 2025-04-09
+Worst Day: -11.98% on 2020-03-16
+
+MARKET DIRECTION
+======================================================================
+Up Days: 802 (54.4%)
+Down Days: 673 (45.6%)
+Flat Days: 0
+
+FEATURES
+======================================================================
+Total Features Created: 83
+- Sentiment Features: 30
+- Technical Indicators: 16
+- Lag Features: 11
+- Rolling Features: 21
+
+VISUALIZATIONS CREATED
+======================================================================
+1. analysis_price_history.png - Price history and returns distribution
+2. analysis_sentiment_timeline.png - Sentiment over time
+3. analysis_price_vs_sentiment.png - Price vs sentiment correlation
+4. analysis_correlation_heatmap.png - Feature correlations
+5. analysis_monthly_returns.png - Monthly performance breakdown
+
+INTERPRETATION
+======================================================================
+Model Accuracy: ~52%
+
+This represents a slight edge over random guessing (50%). While this may seem
+modest, in financial markets even small edges can be valuable when combined
+with proper risk management.
+
+Key Insights:
+- The market showed a 110.3% return over the period
+- Up days slightly outnumber down days (54.4% vs 45.6%)
+- Sentiment features combined with technical indicators provide modest predictive power
+
+NEXT STEPS
+======================================================================
+1. Collect more diverse news sources for better sentiment signals
+2. Experiment with different model architectures (LSTM, ensemble methods)
+3. Add additional features (market indicators, sector data, macro data)
+4. Implement backtesting strategy to evaluate real-world performance
+5. Consider using the model as one signal in a multi-factor strategy
+
+======================================================================
+DISCLAIMER: This is for educational purposes only. Not financial advice.
+======================================================================

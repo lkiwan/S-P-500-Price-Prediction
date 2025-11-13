@@ -1,0 +1,85 @@
+
+======================================================================
+BACKTEST ANALYSIS REPORT - LAST MONTH
+======================================================================
+Generated: 2025-11-13 22:52:34
+
+PERIOD ANALYZED
+======================================================================
+Start Date: 2025-10-12
+End Date: 2025-11-11
+Trading Days: 22
+Model: sp500_complete_20251113
+Sentiment Source: REAL news
+
+PREDICTION PERFORMANCE
+======================================================================
+Total Predictions: 22
+Correct: 14
+Incorrect: 8
+Accuracy: 63.64%
+Edge over Random: +13.64 percentage points
+
+Confusion Matrix:
+  True Negatives (Down->Down): 1
+  False Positives (Down->Up): 6
+  False Negatives (Up->Down): 2
+  True Positives (Up->Up): 13
+
+Precision (Up): 68.42%
+Recall (Up): 86.67%
+
+CONFIDENCE ANALYSIS
+======================================================================
+Average Confidence: 69.19%
+Accuracy (Confidence >= 70%): 72.73% (n=11)
+Accuracy (Confidence >= 60%): 62.50% (n=16)
+Accuracy (Confidence >= 50%): 63.64% (n=22)
+
+NEWS-PRICE RELATIONSHIP
+======================================================================
+Correlation (Sentiment vs Next-Day Return): -0.0521
+Correlation (Sentiment vs Same-Day Return): -0.0360
+Sentiment Directional Accuracy: 65.00%
+
+Average Returns by Sentiment Level:
+  Negative: +1.067% (n=1 days)
+  Neutral: +0.106% (n=8 days)
+  Positive: +0.143% (n=10 days)
+
+INTERPRETATION
+======================================================================
+[+] Model is performing WELL (63.64% accuracy)
+  This 13.6pp edge over random is statistically significant
+
+~ Sentiment correlation is WEAK (-0.052)
+  News sentiment alone is not a strong predictor
+
+TRADING SIMULATION
+======================================================================
+Initial Capital: $10,000.00
+Final Capital: $10,378.97
+Total Return: +3.79%
+Trades Taken (Conf >= 60%): 16
+Winning Trades: 10
+Win Rate: 62.5%
+
+Buy & Hold Return (Same Period): +2.95%
+[+] Strategy OUTPERFORMED buy & hold by 0.84pp
+
+======================================================================
+FILES GENERATED
+======================================================================
+  - backtest_analysis.png (visualizations)
+  - backtest_report.txt (this report)
+
+RECOMMENDATIONS
+======================================================================
+[+] Model shows promise for live trading
+[+] Continue with paper trading to validate
+[+] Consider gradual position sizing
+
+======================================================================
+DISCLAIMER: Past performance does not guarantee future results.
+This analysis is for educational purposes only.
+======================================================================

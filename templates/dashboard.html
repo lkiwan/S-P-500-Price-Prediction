@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S&P 500 Prediction Dashboard</title>
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+
+    <!-- ApexCharts for Candlestick -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.44.0/dist/apexcharts.min.js"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-gradient-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="#">
+                <i class="fas fa-chart-line me-2"></i>
+                S&P 500 AI Prediction
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/"><i class="fas fa-home me-1"></i> Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/report"><i class="fas fa-file-alt me-1"></i> Project Report</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#predictions"><i class="fas fa-history me-1"></i> History</a>
+                    </li>
+                    <li class="nav-item">
+                        <span class="nav-link" id="live-time"><i class="far fa-clock me-1"></i> <span id="current-time"></span></span>
+                    </li>
+                    <li class="nav-item">
+                        <button class="btn btn-sm nav-link" id="auto-refresh-toggle" onclick="toggleAutoRefresh()" title="Toggle Auto-Refresh">
+                            <i class="fas fa-sync-alt" id="refresh-icon"></i>
+                            <span class="small ms-1" id="refresh-status">Auto</span>
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="btn btn-sm nav-link" id="theme-toggle" onclick="toggleTheme()">
+                            <i class="fas fa-moon" id="theme-icon"></i>
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="container-fluid px-4 py-4">
+
+        <!-- Market Status Bar -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0 market-status-card">
+                    <div class="card-body py-3">
+                        <div class="row align-items-center">
+                            <div class="col-lg-2 col-md-3 mb-2 mb-md-0">
+                                <h5 class="mb-0 fw-bold">S&P 500</h5>
+                                <small class="text-muted">As of <span id="market-date">Loading...</span></small>
+                            </div>
+                            <div class="col-lg-2 col-md-3 text-center mb-2 mb-md-0">
+                                <h3 class="mb-0 fw-bold" id="current-price">$0.00</h3>
+                                <small class="text-muted">Current Price</small>
+                            </div>
+                            <div class="col-lg-2 col-md-3 text-center mb-2 mb-md-0">
+                                <h4 class="mb-0" id="price-change">
+                                    <span class="badge">+0.00%</span>
+                                </h4>
+                                <small class="text-muted">Daily Change</small>
+                            </div>
+                            <div class="col-lg-3 col-md-6 text-center mb-2 mb-md-0">
+                                <div class="market-hours-box p-2 rounded">
+                                    <div class="d-flex justify-content-center align-items-center gap-2 mb-1">
+                                        <span class="market-status-badge" id="market-status-badge">
+                                            <i class="fas fa-circle me-1"></i>
+                                            <span id="market-status-text">Checking...</span>
+                                        </span>
+                                    </div>
+                                    <div class="small text-muted">
+                                        <i class="far fa-clock me-1"></i>
+                                        <span id="market-hours-text">Market Hours: 9:30 AM - 4:00 PM ET</span>
+                                    </div>
+                                    <div class="small fw-bold" id="countdown-text" style="color: #667eea;">
+                                        <!-- Countdown will appear here -->
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-md-6 text-end">
+                                <button class="btn btn-primary btn-lg me-2" id="predict-btn" onclick="runPrediction()">
+                                    <i class="fas fa-magic me-2"></i>Get Prediction
+                                </button>
+                                <button class="btn btn-success btn-lg" onclick="exportPDF()">
+                                    <i class="fas fa-file-pdf me-2"></i>Export PDF
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Economic Indicators Panel -->
+        <div class="row g-4 mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4 fw-bold">
+                            <i class="fas fa-chart-area me-2 text-info"></i>Key Economic Indicators
+                        </h5>
+                        <div class="row g-3">
+                            <!-- Fed Funds Rate -->
+                            <div class="col-lg-2 col-md-4 col-6">
+                                <div class="indicator-box text-center p-3 bg-light rounded">
+                                    <div class="indicator-label small text-muted">Fed Rate</div>
+                                    <div class="indicator-value h5 fw-bold mb-1" id="ind-fed-rate">0.00%</div>
+                                    <div class="indicator-change small" id="ind-fed-change">
+                                        <i class="fas fa-minus"></i> 0.00
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Unemployment -->
+                            <div class="col-lg-2 col-md-4 col-6">
+                                <div class="indicator-box text-center p-3 bg-light rounded">
+                                    <div class="indicator-label small text-muted">Unemployment</div>
+                                    <div class="indicator-value h5 fw-bold mb-1" id="ind-unemployment">0.00%</div>
+                                    <div class="indicator-change small" id="ind-unemployment-change">
+                                        <i class="fas fa-minus"></i> 0.00
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- CPI -->
+                            <div class="col-lg-2 col-md-4 col-6">
+                                <div class="indicator-box text-center p-3 bg-light rounded">
+                                    <div class="indicator-label small text-muted">CPI (Inflation)</div>
+                                    <div class="indicator-value h5 fw-bold mb-1" id="ind-cpi">0.00</div>
+                                    <div class="indicator-change small" id="ind-cpi-change">
+                                        <i class="fas fa-minus"></i> 0.00
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- VIX -->
+                            <div class="col-lg-2 col-md-4 col-6">
+                                <div class="indicator-box text-center p-3 bg-light rounded">
+                                    <div class="indicator-label small text-muted">VIX</div>
+                                    <div class="indicator-value h5 fw-bold mb-1" id="ind-vix">0.00</div>
+                                    <div class="indicator-change small" id="ind-vix-change">
+                                        <i class="fas fa-minus"></i> 0.00
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- 10Y Treasury -->
+                            <div class="col-lg-2 col-md-4 col-6">
+                                <div class="indicator-box text-center p-3 bg-light rounded">
+                                    <div class="indicator-label small text-muted">10Y Treasury</div>
+                                    <div class="indicator-value h5 fw-bold mb-1" id="ind-treasury">0.00%</div>
+                                    <div class="indicator-change small" id="ind-treasury-change">
+                                        <i class="fas fa-minus"></i> 0.00
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Yield Curve -->
+                            <div class="col-lg-2 col-md-4 col-6">
+                                <div class="indicator-box text-center p-3 bg-light rounded">
+                                    <div class="indicator-label small text-muted">Yield Curve</div>
+                                    <div class="indicator-value h5 fw-bold mb-1" id="ind-yield">0.00</div>
+                                    <div class="indicator-change small" id="ind-yield-change">
+                                        <i class="fas fa-minus"></i> 0.00
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Candlestick Chart -->
+        <div class="row g-4 mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h5 class="card-title mb-0 fw-bold">
+                                <i class="fas fa-chart-candlestick me-2 text-success"></i>Interactive Candlestick Chart (Last 90 Days)
+                            </h5>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-outline-primary active" onclick="updateCandlestickPeriod(90)">90D</button>
+                                <button type="button" class="btn btn-outline-primary" onclick="updateCandlestickPeriod(60)">60D</button>
+                                <button type="button" class="btn btn-outline-primary" onclick="updateCandlestickPeriod(30)">30D</button>
+                            </div>
+                        </div>
+                        <div id="candlestickChart"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Technical Indicators Chart & News Feed -->
+        <div class="row g-4 mb-4">
+            <!-- Technical Indicators Chart -->
+            <div class="col-lg-8">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4 fw-bold">
+                            <i class="fas fa-chart-line me-2 text-primary"></i>Technical Indicators (Last 60 Days)
+                        </h5>
+                        <canvas id="technicalChart" height="80"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent News Feed -->
+            <div class="col-lg-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4 fw-bold">
+                            <i class="fas fa-newspaper me-2 text-warning"></i>Recent News Analysis
+                        </h5>
+                        <div id="news-feed" style="max-height: 400px; overflow-y: auto;">
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-spinner fa-spin me-2"></i>Loading news...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Stats Cards -->
+        <div class="row g-4 mb-4">
+            <!-- Latest Prediction Card -->
+            <div class="col-xl-4 col-lg-6">
+                <div class="card shadow-sm border-0 h-100 prediction-card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="card-title mb-0 fw-bold">
+                                <i class="fas fa-brain me-2 text-primary"></i>Latest Prediction
+                            </h5>
+                            <span class="badge bg-light text-dark" id="pred-time">Just now</span>
+                        </div>
+
+                        <div class="text-center py-4">
+                            <div class="prediction-icon mb-3" id="direction-icon">
+                                <i class="fas fa-arrow-up" style="font-size: 4rem;"></i>
+                            </div>
+                            <h2 class="fw-bold mb-2" id="prediction-direction">UP</h2>
+                            <p class="text-muted mb-4" id="prediction-label">BULLISH</p>
+
+                            <!-- Confidence Gauge -->
+                            <div class="confidence-gauge mb-3">
+                                <div class="gauge-label">Confidence Level</div>
+                                <div class="gauge-value" id="confidence-value">59.10%</div>
+                                <div class="progress" style="height: 12px;">
+                                    <div class="progress-bar" role="progressbar" id="confidence-bar"
+                                         style="width: 59%"></div>
+                                </div>
+                                <div class="gauge-rating mt-2">
+                                    <span class="badge" id="confidence-badge">MEDIUM</span>
+                                </div>
+                            </div>
+
+                            <!-- Probabilities -->
+                            <div class="row mt-4">
+                                <div class="col-6">
+                                    <div class="prob-card up">
+                                        <i class="fas fa-arrow-up mb-2"></i>
+                                        <div class="prob-value" id="prob-up">59.10%</div>
+                                        <div class="prob-label">Up Probability</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="prob-card down">
+                                        <i class="fas fa-arrow-down mb-2"></i>
+                                        <div class="prob-value" id="prob-down">40.90%</div>
+                                        <div class="prob-label">Down Probability</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance Metrics -->
+            <div class="col-xl-4 col-lg-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4 fw-bold">
+                            <i class="fas fa-chart-bar me-2 text-success"></i>Performance Metrics
+                        </h5>
+
+                        <div class="metric-item">
+                            <div class="metric-label">
+                                <i class="fas fa-bullseye text-primary"></i>
+                                Model Accuracy
+                            </div>
+                            <div class="metric-value text-success" id="model-accuracy">63.64%</div>
+                        </div>
+
+                        <div class="metric-item">
+                            <div class="metric-label">
+                                <i class="fas fa-trophy text-warning"></i>
+                                Edge Over Random
+                            </div>
+                            <div class="metric-value text-info" id="edge-over-random">+13.64pp</div>
+                        </div>
+
+                        <div class="metric-item">
+                            <div class="metric-label">
+                                <i class="fas fa-chart-line text-success"></i>
+                                Total Predictions
+                            </div>
+                            <div class="metric-value" id="total-predictions">0</div>
+                        </div>
+
+                        <div class="metric-item">
+                            <div class="metric-label">
+                                <i class="fas fa-percentage text-info"></i>
+                                Average Confidence
+                            </div>
+                            <div class="metric-value" id="avg-confidence">0%</div>
+                        </div>
+
+                        <div class="metric-item mb-0">
+                            <div class="metric-label">
+                                <i class="fas fa-balance-scale text-secondary"></i>
+                                Up / Down Ratio
+                            </div>
+                            <div class="metric-value" id="up-down-ratio">0 / 0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Confidence Distribution -->
+            <div class="col-xl-4 col-lg-12">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4 fw-bold">
+                            <i class="fas fa-chart-pie me-2 text-warning"></i>Confidence Distribution
+                        </h5>
+                        <canvas id="confidenceChart" height="250"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Explanation & Economic Calendar Row -->
+        <div class="row g-4 mb-4">
+            <!-- AI Explanation Module -->
+            <div class="col-lg-8">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4 fw-bold">
+                            <i class="fas fa-brain me-2 text-info"></i>AI Prediction Explanation
+                        </h5>
+                        <p class="text-muted small mb-3">Top 10 features driving the model's prediction</p>
+
+                        <div id="ai-explanation-content">
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-spinner fa-spin me-2"></i>Analyzing...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Economic Calendar -->
+            <div class="col-lg-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4 fw-bold">
+                            <i class="fas fa-calendar-alt me-2 text-danger"></i>Upcoming Events
+                        </h5>
+
+                        <div id="economic-calendar" style="max-height: 450px; overflow-y: auto;">
+                            <!-- Economic events will be populated dynamically -->
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-spinner fa-spin me-2"></i>Loading upcoming events...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="row g-4 mb-4">
+            <!-- Prediction History Chart -->
+            <div class="col-lg-8">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4 fw-bold">
+                            <i class="fas fa-history me-2 text-primary"></i>Prediction History (Last 12 Months)
+                        </h5>
+                        <canvas id="predictionHistoryChart" height="100"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sentiment Timeline -->
+            <div class="col-lg-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4 fw-bold">
+                            <i class="fas fa-smile me-2 text-info"></i>Sentiment Timeline
+                        </h5>
+                        <canvas id="sentimentChart" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics Section: Feature Importance -->
+        <div class="row g-4 mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4 fw-bold">
+                            <i class="fas fa-star me-2 text-warning"></i>Top 15 Feature Importance
+                        </h5>
+                        <p class="text-muted small mb-3">Features that drive the model's predictions (higher = more important)</p>
+                        <canvas id="featureImportanceChart" height="80"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics Section: Trading Simulation & Rolling Accuracy -->
+        <div class="row g-4 mb-4">
+            <!-- Trading Simulation Widget -->
+            <div class="col-lg-8">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4 fw-bold">
+                            <i class="fas fa-chart-line me-2 text-success"></i>Trading Simulation
+                        </h5>
+                        <p class="text-muted small mb-4">Hypothetical performance if following model predictions (50% position size)</p>
+
+                        <!-- Key Metrics -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-3 col-6">
+                                <div class="metric-box text-center p-3 bg-light rounded">
+                                    <div class="metric-label small text-muted">Starting Capital</div>
+                                    <div class="metric-value h5 fw-bold mb-0" id="sim-initial-capital">$10,000</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-6">
+                                <div class="metric-box text-center p-3 bg-light rounded">
+                                    <div class="metric-label small text-muted">Final Capital</div>
+                                    <div class="metric-value h5 fw-bold mb-0" id="sim-final-capital">$0</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-6">
+                                <div class="metric-box text-center p-3 bg-success bg-opacity-10 rounded">
+                                    <div class="metric-label small text-muted">Total Return</div>
+                                    <div class="metric-value h5 fw-bold mb-0 text-success" id="sim-total-return">+0%</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-6">
+                                <div class="metric-box text-center p-3 bg-info bg-opacity-10 rounded">
+                                    <div class="metric-label small text-muted">Win Rate</div>
+                                    <div class="metric-value h5 fw-bold mb-0 text-info" id="sim-win-rate">0%</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Performance Comparison -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="text-muted small">Model Strategy:</span>
+                                    <span class="fw-bold" id="sim-model-return">+0%</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="text-muted small">Buy & Hold:</span>
+                                    <span class="fw-bold" id="sim-buyhold-return">+0%</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="text-muted small">Outperformance:</span>
+                                    <span class="fw-bold" id="sim-outperformance">+0pp</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Capital Growth Chart -->
+                        <canvas id="capitalGrowthChart" height="80"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rolling Accuracy Chart -->
+            <div class="col-lg-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4 fw-bold">
+                            <i class="fas fa-sync-alt me-2 text-primary"></i>Rolling Accuracy
+                        </h5>
+                        <p class="text-muted small mb-4">Model accuracy over different time windows</p>
+
+                        <!-- Accuracy Metrics -->
+                        <div class="accuracy-metric mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="fw-semibold">7-Day Rolling</span>
+                                <span class="badge bg-primary" id="rolling-7d-value">0%</span>
+                            </div>
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar bg-primary" id="rolling-7d-bar" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <div class="accuracy-metric mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="fw-semibold">30-Day Rolling</span>
+                                <span class="badge bg-success" id="rolling-30d-value">0%</span>
+                            </div>
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar bg-success" id="rolling-30d-bar" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <div class="accuracy-metric mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="fw-semibold">90-Day Rolling</span>
+                                <span class="badge bg-info" id="rolling-90d-value">0%</span>
+                            </div>
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar bg-info" id="rolling-90d-bar" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <div class="text-center">
+                            <div class="text-muted small mb-2">Overall Accuracy</div>
+                            <div class="display-6 fw-bold text-primary" id="rolling-overall-accuracy">0%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Predictions Table -->
+        <div class="row" id="predictions">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4 fw-bold">
+                            <i class="fas fa-table me-2 text-secondary"></i>Recent Predictions
+                        </h5>
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="predictions-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Predicted</th>
+                                        <th>Actual</th>
+                                        <th>Result</th>
+                                        <th>Confidence</th>
+                                        <th>Return</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="predictions-tbody">
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted">
+                                            <i class="fas fa-spinner fa-spin me-2"></i>Loading predictions...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance Analytics Section -->
+        <div class="row g-4 mb-4">
+            <!-- Confusion Matrix & Metrics -->
+            <div class="col-lg-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4 fw-bold">
+                            <i class="fas fa-th me-2 text-danger"></i>Confusion Matrix
+                        </h5>
+
+                        <!-- Confusion Matrix Grid -->
+                        <div class="confusion-matrix-container mb-4">
+                            <table class="table table-bordered text-center mb-0">
+                                <thead>
+                                    <tr>
+                                        <th colspan="2" rowspan="2" class="align-middle bg-light"></th>
+                                        <th colspan="2" class="bg-info text-white">Actual</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="bg-info bg-opacity-50">UP</th>
+                                        <th class="bg-info bg-opacity-50">DOWN</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <th rowspan="2" class="align-middle bg-warning text-white" style="writing-mode: vertical-lr; transform: rotate(180deg);">Predicted</th>
+                                        <th class="bg-warning bg-opacity-50">UP</th>
+                                        <td class="confusion-cell bg-success bg-opacity-10">
+                                            <div class="h4 mb-0 fw-bold text-success" id="cm-tp">0</div>
+                                            <small class="text-muted">True Positive</small>
+                                        </td>
+                                        <td class="confusion-cell bg-danger bg-opacity-10">
+                                            <div class="h4 mb-0 fw-bold text-danger" id="cm-fp">0</div>
+                                            <small class="text-muted">False Positive</small>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th class="bg-warning bg-opacity-50">DOWN</th>
+                                        <td class="confusion-cell bg-danger bg-opacity-10">
+                                            <div class="h4 mb-0 fw-bold text-danger" id="cm-fn">0</div>
+                                            <small class="text-muted">False Negative</small>
+                                        </td>
+                                        <td class="confusion-cell bg-success bg-opacity-10">
+                                            <div class="h4 mb-0 fw-bold text-success" id="cm-tn">0</div>
+                                            <small class="text-muted">True Negative</small>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Performance Metrics -->
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <div class="text-center p-2 bg-light rounded">
+                                    <small class="text-muted">Precision</small>
+                                    <div class="h5 fw-bold mb-0" id="cm-precision">0%</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center p-2 bg-light rounded">
+                                    <small class="text-muted">Recall</small>
+                                    <div class="h5 fw-bold mb-0" id="cm-recall">0%</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center p-2 bg-light rounded">
+                                    <small class="text-muted">F1-Score</small>
+                                    <div class="h5 fw-bold mb-0" id="cm-f1">0%</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center p-2 bg-primary bg-opacity-10 rounded">
+                                    <small class="text-muted">Accuracy</small>
+                                    <div class="h5 fw-bold text-primary mb-0" id="cm-accuracy">0%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Risk Metrics Card -->
+            <div class="col-lg-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4 fw-bold">
+                            <i class="fas fa-exclamation-triangle me-2 text-warning"></i>Risk & Performance Metrics
+                        </h5>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-6">
+                                <div class="text-center p-3 bg-danger bg-opacity-10 rounded">
+                                    <small class="text-muted">Max Drawdown</small>
+                                    <div class="h4 fw-bold text-danger mb-0" id="risk-drawdown">0%</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center p-3 bg-success bg-opacity-10 rounded">
+                                    <small class="text-muted">Sharpe Ratio</small>
+                                    <div class="h4 fw-bold text-success mb-0" id="risk-sharpe">0.00</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-6">
+                                <div class="text-center p-2 bg-light rounded">
+                                    <small class="text-muted">Max Win Streak</small>
+                                    <div class="h5 fw-bold text-success mb-0" id="risk-win-streak">0</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center p-2 bg-light rounded">
+                                    <small class="text-muted">Max Loss Streak</small>
+                                    <div class="h5 fw-bold text-danger mb-0" id="risk-loss-streak">0</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="current-streak text-center p-3 bg-info bg-opacity-10 rounded mb-3">
+                            <small class="text-muted">Current Streak</small>
+                            <div class="h4 fw-bold mb-0" id="risk-current-streak">0 Wins</div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <div class="text-center p-2 bg-light rounded">
+                                    <small class="text-muted">Avg Win Return</small>
+                                    <div class="fw-bold text-success" id="risk-avg-win">+0%</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center p-2 bg-light rounded">
+                                    <small class="text-muted">Avg Loss Return</small>
+                                    <div class="fw-bold text-danger" id="risk-avg-loss">0%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Best & Worst Predictions -->
+        <div class="row g-4 mb-4">
+            <!-- Best Predictions -->
+            <div class="col-lg-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4 fw-bold">
+                            <i class="fas fa-trophy me-2 text-success"></i>Top 5 Best Predictions
+                        </h5>
+                        <div id="best-predictions-list">
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-spinner fa-spin me-2"></i>Loading...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Worst Predictions -->
+            <div class="col-lg-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4 fw-bold">
+                            <i class="fas fa-times-circle me-2 text-danger"></i>Top 5 Worst Predictions
+                        </h5>
+                        <div id="worst-predictions-list">
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-spinner fa-spin me-2"></i>Loading...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <footer class="text-center py-4 mt-5 bg-light">
+        <p class="mb-1 text-muted">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            <strong>Disclaimer:</strong> For educational purposes only. Not financial advice.
+        </p>
+        <p class="mb-0 text-muted small">
+            S&P 500 AI Prediction Dashboard | Powered by Machine Learning | Model Accuracy: 63.64%
+        </p>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+
+</body>
+</html>
