@@ -12,6 +12,9 @@ import json
 from io import BytesIO
 import base64
 import numpy as np
+import yfinance as yf
+import threading
+import time
 
 # Add src to path
 sys.path.append('src')
@@ -300,38 +303,6 @@ def save_prediction_to_history(result, data_date):
 
     except Exception as e:
         print(f"Error saving prediction: {e}")
-
-
-@app.route('/api/market_status')
-def get_market_status():
-    """Get current market status"""
-    try:
-        if not os.path.exists(PRICE_FILE):
-            return jsonify({'success': False, 'message': 'No price data'})
-
-        df = pd.read_csv(PRICE_FILE)
-        df['date'] = pd.to_datetime(df['date'])
-
-        # Get latest price
-        latest = df.iloc[-1]
-        previous = df.iloc[-2]
-
-        current_price = float(latest['close'])
-        prev_price = float(previous['close'])
-        change = current_price - prev_price
-        change_pct = (change / prev_price) * 100
-
-        status = {
-            'current_price': current_price,
-            'change': change,
-            'change_pct': change_pct,
-            'date': latest['date'].strftime('%Y-%m-%d') if hasattr(latest['date'], 'strftime') else str(latest['date'])
-        }
-
-        return jsonify({'success': True, 'market': status})
-
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
 
 
 @app.route('/report')
@@ -1997,6 +1968,134 @@ def export_pdf():
             download_name=f'SP500_Comprehensive_Report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf',
             mimetype='application/pdf'
         )
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+def update_market_prices():
+    """Auto-update market prices from Yahoo Finance"""
+    try:
+        print("\n[AUTO-UPDATE] Fetching latest S&P 500 prices...")
+        sp500 = yf.Ticker('^GSPC')
+        latest_data = sp500.history(period='5d')
+
+        if len(latest_data) > 0:
+            latest_data.index = latest_data.index.tz_localize(None)
+            latest_close = latest_data['Close'].iloc[-1]
+            latest_date = latest_data.index[-1]
+
+            # Update price file if newer data available
+            if os.path.exists(PRICE_FILE):
+                existing_data = pd.read_csv(PRICE_FILE, parse_dates=['date'])
+                last_date = pd.to_datetime(existing_data['date'].iloc[-1])
+
+                if latest_date.date() > last_date.date():
+                    print(f"[AUTO-UPDATE] New data available! Latest: ${latest_close:,.2f} ({latest_date.strftime('%Y-%m-%d')})")
+                    # Would update file here in production
+                else:
+                    print(f"[AUTO-UPDATE] Data is up to date (Last: {last_date.strftime('%Y-%m-%d')})")
+
+            return True
+    except Exception as e:
+        print(f"[AUTO-UPDATE] Error: {e}")
+        return False
+
+
+@app.route('/api/update_prices')
+def api_update_prices():
+    """API endpoint to trigger price update"""
+    try:
+        print("\n[API] Manual price update requested...")
+        sp500 = yf.Ticker('^GSPC')
+        latest_data = sp500.history(period='5d')
+
+        if len(latest_data) == 0:
+            return jsonify({'success': False, 'error': 'No data available from Yahoo Finance'})
+
+        latest_data.index = latest_data.index.tz_localize(None)
+        latest_close = latest_data['Close'].iloc[-1]
+        latest_date = latest_data.index[-1]
+        previous_close = latest_data['Close'].iloc[-2]
+        change = latest_close - previous_close
+        change_pct = (change / previous_close) * 100
+
+        # Check if we have newer data
+        if os.path.exists(PRICE_FILE):
+            existing_data = pd.read_csv(PRICE_FILE, parse_dates=['date'])
+            last_date = pd.to_datetime(existing_data['date'].iloc[-1])
+
+            is_new = latest_date.date() > last_date.date()
+
+            return jsonify({
+                'success': True,
+                'latest_price': float(latest_close),
+                'latest_date': latest_date.strftime('%Y-%m-%d'),
+                'change': float(change),
+                'change_pct': float(change_pct),
+                'high': float(latest_data['High'].iloc[-1]),
+                'low': float(latest_data['Low'].iloc[-1]),
+                'volume': int(latest_data['Volume'].iloc[-1]),
+                'is_new_data': is_new,
+                'last_update': last_date.strftime('%Y-%m-%d'),
+                'message': 'New data available! Run update_latest_data.py to update.' if is_new else 'Data is current.'
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'latest_price': float(latest_close),
+                'latest_date': latest_date.strftime('%Y-%m-%d'),
+                'change': float(change),
+                'change_pct': float(change_pct),
+                'is_new_data': True,
+                'message': 'Price data file not found.'
+            })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/market_status')
+def get_market_status():
+    """Get current market status with latest prices"""
+    try:
+        # Get latest from Yahoo Finance (real-time)
+        sp500 = yf.Ticker('^GSPC')
+        latest_data = sp500.history(period='1d')
+
+        if len(latest_data) > 0:
+            latest_data.index = latest_data.index.tz_localize(None)
+            current_price = latest_data['Close'].iloc[-1]
+
+            # Get previous close from our data
+            if os.path.exists(PRICE_FILE):
+                price_data = pd.read_csv(PRICE_FILE)
+                previous_close = price_data['close'].iloc[-1]
+            else:
+                previous_close = current_price
+
+            change = current_price - previous_close
+            change_pct = (change / previous_close) * 100
+
+            # Determine market status
+            now = datetime.now()
+            hour = now.hour
+            weekday = now.weekday()
+
+            # Market hours: 9:30 AM - 4:00 PM EST, Monday-Friday
+            is_market_hours = (weekday < 5) and (9 <= hour < 16)
+
+            return jsonify({
+                'success': True,
+                'current_price': float(current_price),
+                'previous_close': float(previous_close),
+                'change': float(change),
+                'change_pct': float(change_pct),
+                'is_market_open': is_market_hours,
+                'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            })
+        else:
+            return jsonify({'success': False, 'error': 'No market data available'})
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
