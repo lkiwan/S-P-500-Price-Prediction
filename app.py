@@ -445,7 +445,8 @@ def get_trading_simulation():
             return jsonify({'success': False, 'message': 'Accuracy data not available'})
 
         df = pd.read_csv(accuracy_file)
-        df['prediction_date'] = pd.to_datetime(df['prediction_date'])
+        df['prediction_date'] = pd.to_datetime(df['prediction_date'], format='mixed')
+        df['data_date'] = pd.to_datetime(df['data_date'])
         df = df.sort_values('prediction_date')
 
         # Trading simulation parameters
@@ -502,8 +503,10 @@ def get_trading_simulation():
             price_range = price_df[(price_df['date'] >= start_date) & (price_df['date'] <= end_date)]
 
             if len(price_range) > 1:
-                buy_hold_return = ((price_range.iloc[-1]['close'] - price_range.iloc[0]['close']) /
-                                  price_range.iloc[0]['close']) * 100
+                # Check for uppercase or lowercase column name
+                close_col = 'Close' if 'Close' in price_range.columns else 'close'
+                buy_hold_return = ((price_range.iloc[-1][close_col] - price_range.iloc[0][close_col]) /
+                                  price_range.iloc[0][close_col]) * 100
             else:
                 buy_hold_return = 0
         else:
