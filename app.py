@@ -1029,6 +1029,7 @@ def get_candlestick_data():
         high_col = 'High' if 'High' in df_recent.columns else 'high'
         low_col = 'Low' if 'Low' in df_recent.columns else 'low'
         close_col = 'Close' if 'Close' in df_recent.columns else 'close'
+        volume_col = 'Volume' if 'Volume' in df_recent.columns else 'volume'
 
         # Helper function to safely convert to float
         def safe_float(val):
@@ -1058,9 +1059,10 @@ def get_candlestick_data():
         # Also include volume data
         volume_data = []
         for _, row in df_recent.iterrows():
+            volume_val = safe_float(row[volume_col]) if volume_col in row else 0
             volume_data.append({
                 'x': row['date'].strftime('%Y-%m-%d'),
-                'y': float(row['volume']) if 'volume' in df.columns else 0
+                'y': volume_val if volume_val is not None else 0
             })
 
         return jsonify({
