@@ -669,6 +669,9 @@ def get_technical_indicators():
         # Get last 60 days
         df_recent = df.tail(60)
 
+        # Replace NaN with None for valid JSON
+        df_recent = df_recent.replace({float('nan'): None})
+
         data = {
             'dates': df_recent['date'].dt.strftime('%Y-%m-%d').tolist(),
             'close': df_recent['close'].tolist() if 'close' in df.columns else [],
@@ -948,6 +951,12 @@ def get_ai_explanation():
         # We'll use simple scaling: contribution = feature_value * importance
         contributions = []
         for i, (name, value, imp) in enumerate(zip(feature_names, feature_values, importance)):
+            # Convert NaN to 0 for calculation
+            if pd.isna(value):
+                value = 0
+            if pd.isna(imp):
+                imp = 0
+
             # Simple contribution calculation
             contribution = float(value) * float(imp)
             contributions.append({
@@ -1008,19 +1017,42 @@ def get_candlestick_data():
         # Get last N days
         df_recent = df.tail(days)
 
+        # Replace NaN with None for valid JSON
+        df_recent = df_recent.replace({pd.NA: None, float('nan'): None})
+
         # Format data for ApexCharts candlestick
         # ApexCharts expects: {x: timestamp, y: [open, high, low, close]}
         candlestick_data = []
 
+        # Determine column names (try both uppercase and lowercase)
+        open_col = 'Open' if 'Open' in df_recent.columns else 'open'
+        high_col = 'High' if 'High' in df_recent.columns else 'high'
+        low_col = 'Low' if 'Low' in df_recent.columns else 'low'
+        close_col = 'Close' if 'Close' in df_recent.columns else 'close'
+
+        # Helper function to safely convert to float
+        def safe_float(val):
+            if val is None or pd.isna(val):
+                return None
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                return None
+
         for _, row in df_recent.iterrows():
+            open_val = safe_float(row[open_col]) if open_col in row else None
+            high_val = safe_float(row[high_col]) if high_col in row else None
+            low_val = safe_float(row[low_col]) if low_col in row else None
+            close_val = safe_float(row[close_col]) if close_col in row else None
+
+            # Skip rows where we don't have at least open and close
+            if open_val is None or close_val is None:
+                continue
+
             candlestick_data.append({
                 'x': row['date'].strftime('%Y-%m-%d'),
-                'y': [
-                    float(row['open']),
-                    float(row['high']),
-                    float(row['low']),
-                    float(row['close'])
-                ]
+                'y': [open_val, high_val if high_val is not None else close_val,
+                      low_val if low_val is not None else close_val, close_val]
             })
 
         # Also include volume data
