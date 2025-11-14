@@ -560,7 +560,7 @@ def get_rolling_accuracy():
             return jsonify({'success': False, 'message': 'Accuracy data not available'})
 
         df = pd.read_csv(accuracy_file)
-        df['prediction_date'] = pd.to_datetime(df['prediction_date'])
+        df['prediction_date'] = pd.to_datetime(df['prediction_date'], format='mixed')
         df = df.sort_values('prediction_date')
 
         # Calculate rolling accuracies
@@ -791,7 +791,7 @@ def get_risk_metrics():
             return jsonify({'success': False, 'message': 'Accuracy data not available'})
 
         df = pd.read_csv(accuracy_file)
-        df['prediction_date'] = pd.to_datetime(df['prediction_date'])
+        df['prediction_date'] = pd.to_datetime(df['prediction_date'], format='mixed')
         df = df.sort_values('prediction_date')
 
         # Calculate returns assuming 50% position size
@@ -874,7 +874,7 @@ def get_best_worst_predictions():
             return jsonify({'success': False, 'message': 'Accuracy data not available'})
 
         df = pd.read_csv(accuracy_file)
-        df['prediction_date'] = pd.to_datetime(df['prediction_date'])
+        df['prediction_date'] = pd.to_datetime(df['prediction_date'], format='mixed')
 
         # Calculate absolute return (for impact)
         df['abs_return'] = df['actual_return'].abs()
