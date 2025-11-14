@@ -2059,43 +2059,81 @@ def api_update_prices():
 def get_market_status():
     """Get current market status with latest prices"""
     try:
-        # Get latest from Yahoo Finance (real-time)
-        sp500 = yf.Ticker('^GSPC')
-        latest_data = sp500.history(period='1d')
+        # Try to get latest from Yahoo Finance (real-time)
+        try:
+            sp500 = yf.Ticker('^GSPC')
+            latest_data = sp500.history(period='1d')
 
-        if len(latest_data) > 0:
-            latest_data.index = latest_data.index.tz_localize(None)
-            current_price = latest_data['Close'].iloc[-1]
+            if len(latest_data) > 0:
+                latest_data.index = latest_data.index.tz_localize(None)
+                current_price = latest_data['Close'].iloc[-1]
 
-            # Get previous close from our data
-            if os.path.exists(PRICE_FILE):
-                price_data = pd.read_csv(PRICE_FILE)
-                previous_close = price_data['close'].iloc[-1]
-            else:
-                previous_close = current_price
+                # Get previous close from our data
+                if os.path.exists(PRICE_FILE):
+                    price_data = pd.read_csv(PRICE_FILE)
+                    previous_close = price_data['close'].iloc[-1]
+                else:
+                    previous_close = current_price
 
-            change = current_price - previous_close
-            change_pct = (change / previous_close) * 100
+                change = current_price - previous_close
+                change_pct = (change / previous_close) * 100
 
-            # Determine market status
-            now = datetime.now()
-            hour = now.hour
-            weekday = now.weekday()
+                # Determine market status
+                now = datetime.now()
+                hour = now.hour
+                weekday = now.weekday()
 
-            # Market hours: 9:30 AM - 4:00 PM EST, Monday-Friday
-            is_market_hours = (weekday < 5) and (9 <= hour < 16)
+                # Market hours: 9:30 AM - 4:00 PM EST, Monday-Friday
+                is_market_hours = (weekday < 5) and (9 <= hour < 16)
+
+                return jsonify({
+                    'success': True,
+                    'market': {
+                        'current_price': float(current_price),
+                        'previous_close': float(previous_close),
+                        'change': float(change),
+                        'change_pct': float(change_pct),
+                        'date': datetime.now().strftime('%Y-%m-%d'),
+                        'is_market_open': is_market_hours,
+                        'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'source': 'yahoo_finance'
+                    }
+                })
+        except:
+            pass  # Fall back to CSV data
+
+        # Fallback: Get latest from CSV file
+        if os.path.exists(PRICE_FILE):
+            df = pd.read_csv(PRICE_FILE)
+            df['date'] = pd.to_datetime(df['date'])
+
+            # Get latest price - try both lowercase and uppercase column names
+            latest = df.iloc[-1]
+            previous = df.iloc[-2]
+
+            # Check if we have uppercase or lowercase columns
+            close_col = 'Close' if 'Close' in df.columns else 'close'
+
+            current_price = float(latest[close_col])
+            prev_price = float(previous[close_col])
+            change = current_price - prev_price
+            change_pct = (change / prev_price) * 100
 
             return jsonify({
                 'success': True,
-                'current_price': float(current_price),
-                'previous_close': float(previous_close),
-                'change': float(change),
-                'change_pct': float(change_pct),
-                'is_market_open': is_market_hours,
-                'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                'market': {
+                    'current_price': current_price,
+                    'previous_close': prev_price,
+                    'change': change,
+                    'change_pct': change_pct,
+                    'date': latest['date'].strftime('%Y-%m-%d') if hasattr(latest['date'], 'strftime') else str(latest['date']),
+                    'is_market_open': False,
+                    'last_update': latest['date'].strftime('%Y-%m-%d') if hasattr(latest['date'], 'strftime') else str(latest['date']),
+                    'source': 'csv_file'
+                }
             })
         else:
-            return jsonify({'success': False, 'error': 'No market data available'})
+            return jsonify({'success': False, 'error': 'No price data available'})
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
