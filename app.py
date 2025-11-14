@@ -503,10 +503,28 @@ def get_trading_simulation():
             price_range = price_df[(price_df['date'] >= start_date) & (price_df['date'] <= end_date)]
 
             if len(price_range) > 1:
-                # Check for uppercase or lowercase column name
-                close_col = 'Close' if 'Close' in price_range.columns else 'close'
-                buy_hold_return = ((price_range.iloc[-1][close_col] - price_range.iloc[0][close_col]) /
-                                  price_range.iloc[0][close_col]) * 100
+                # Handle mixed close/Close columns (old data has 'close', new data has 'Close')
+                first_row = price_range.iloc[0]
+                last_row = price_range.iloc[-1]
+
+                # Get start price (try both columns)
+                start_price = None
+                if 'close' in price_range.columns and not pd.isna(first_row['close']):
+                    start_price = first_row['close']
+                elif 'Close' in price_range.columns and not pd.isna(first_row['Close']):
+                    start_price = first_row['Close']
+
+                # Get end price (try both columns)
+                end_price = None
+                if 'Close' in price_range.columns and not pd.isna(last_row['Close']):
+                    end_price = last_row['Close']
+                elif 'close' in price_range.columns and not pd.isna(last_row['close']):
+                    end_price = last_row['close']
+
+                if start_price is not None and end_price is not None:
+                    buy_hold_return = ((end_price - start_price) / start_price) * 100
+                else:
+                    buy_hold_return = 0
             else:
                 buy_hold_return = 0
         else:
