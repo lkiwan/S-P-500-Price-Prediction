@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 import json
 from io import BytesIO
 import base64
+import numpy as np
 
 # Add src to path
 sys.path.append('src')
@@ -1366,6 +1367,7 @@ def monte_carlo_scenarios():
 def export_pdf():
     """Generate comprehensive PDF report with all analytics"""
     try:
+        import numpy as np
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import letter
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
@@ -1375,7 +1377,7 @@ def export_pdf():
 
         # Create PDF in memory
         buffer = BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=60, leftMargin=60, topMargin=50, bottomMargin=30)
+        doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=50, leftMargin=50, topMargin=35, bottomMargin=25)
 
         elements = []
         styles = getSampleStyleSheet()
@@ -1384,9 +1386,9 @@ def export_pdf():
         title_style = ParagraphStyle(
             'CustomTitle',
             parent=styles['Heading1'],
-            fontSize=26,
+            fontSize=24,
             textColor=colors.HexColor('#1e40af'),
-            spaceAfter=10,
+            spaceAfter=6,
             alignment=TA_CENTER,
             fontName='Helvetica-Bold'
         )
@@ -1394,40 +1396,39 @@ def export_pdf():
         subtitle_style = ParagraphStyle(
             'Subtitle',
             parent=styles['Normal'],
-            fontSize=12,
+            fontSize=11,
             textColor=colors.HexColor('#6b7280'),
-            spaceAfter=30,
+            spaceAfter=12,
             alignment=TA_CENTER
         )
 
         heading_style = ParagraphStyle(
             'CustomHeading',
             parent=styles['Heading2'],
-            fontSize=16,
+            fontSize=14,
             textColor=colors.HexColor('#3b82f6'),
-            spaceAfter=10,
-            spaceBefore=15,
+            spaceAfter=6,
+            spaceBefore=8,
             fontName='Helvetica-Bold'
         )
 
         subheading_style = ParagraphStyle(
             'SubHeading',
             parent=styles['Heading3'],
-            fontSize=13,
+            fontSize=12,
             textColor=colors.HexColor('#6366f1'),
-            spaceAfter=8,
-            spaceBefore=10,
+            spaceAfter=4,
+            spaceBefore=6,
             fontName='Helvetica-Bold'
         )
 
         # ================== TITLE PAGE ==================
-        elements.append(Spacer(1, 1.5*inch))
+        elements.append(Spacer(1, 0.8*inch))
         title = Paragraph("S&P 500 AI PREDICTION REPORT", title_style)
         elements.append(title)
 
         subtitle = Paragraph("Comprehensive Analytics & Performance Review", subtitle_style)
         elements.append(subtitle)
-        elements.append(Spacer(1, 0.3*inch))
 
         date_text = Paragraph(
             f"<b>Report Generated:</b> {datetime.now().strftime('%B %d, %Y at %I:%M %p')}",
@@ -1435,20 +1436,13 @@ def export_pdf():
         )
         date_text.alignment = TA_CENTER
         elements.append(date_text)
-        elements.append(Spacer(1, 0.5*inch))
+        elements.append(Spacer(1, 0.2*inch))
 
         # Executive Summary Box
-        exec_summary = f"""
-        <para align="justify">
-        This comprehensive report provides a detailed analysis of the S&P 500 AI prediction system's
-        performance, including real-time predictions, backtesting results, Monte Carlo simulations,
-        risk metrics, and feature importance analysis. The system utilizes XGBoost machine learning
-        with 91 technical and sentiment features to predict market direction.
-        </para>
-        """
+        exec_summary = """<para align="justify">This comprehensive report provides a detailed analysis of the S&P 500 AI prediction system's performance, including real-time predictions, backtesting results, Monte Carlo simulations, risk metrics, and feature importance analysis. The system utilizes XGBoost machine learning with 91 technical and sentiment features to predict market direction.</para>"""
         elements.append(Paragraph(exec_summary, styles['Normal']))
 
-        elements.append(PageBreak())
+        elements.append(Spacer(1, 0.3*inch))
 
         # ================== LATEST PREDICTION ==================
         elements.append(Paragraph("1. LATEST PREDICTION", heading_style))
@@ -1474,15 +1468,17 @@ def export_pdf():
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                     ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
                     ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (-1, 0), 11),
-                    ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+                    ('FONTSIZE', (0, 0), (-1, 0), 10),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+                    ('TOPPADDING', (0, 0), (-1, -1), 4),
+                    ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
                     ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
                     ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                    ('FONTSIZE', (0, 1), (-1, -1), 10)
+                    ('FONTSIZE', (0, 1), (-1, -1), 9)
                 ]))
 
                 elements.append(pred_table)
-                elements.append(Spacer(1, 15))
+                elements.append(Spacer(1, 0.15*inch))
 
         # ================== PERFORMANCE METRICS ==================
         elements.append(Paragraph("2. PERFORMANCE METRICS", heading_style))
@@ -1523,15 +1519,16 @@ def export_pdf():
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 3),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
                 ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
                 ('GRID', (0, 0), (-1, -1), 1, colors.black)
             ]))
 
             elements.append(acc_table)
-            elements.append(Spacer(1, 15))
+            elements.append(Spacer(1, 0.1*inch))
 
             # Confusion Matrix
             elements.append(Paragraph("2.2 Confusion Matrix", subheading_style))
@@ -1573,7 +1570,7 @@ def export_pdf():
                 ]))
 
                 elements.append(conf_table)
-                elements.append(Spacer(1, 15))
+                elements.append(Spacer(1, 0.1*inch))
 
             # Best and Worst Predictions
             elements.append(Paragraph("2.3 Best & Worst Predictions", subheading_style))
@@ -1614,8 +1611,7 @@ def export_pdf():
             ]))
 
             elements.append(bw_table)
-
-        elements.append(PageBreak())
+            elements.append(Spacer(1, 0.15*inch))
 
         # ================== BACKTESTING RESULTS ==================
         elements.append(Paragraph("3. BACKTESTING RESULTS", heading_style))
@@ -1671,7 +1667,7 @@ def export_pdf():
                     ]))
 
                     elements.append(bt_table)
-                    elements.append(Spacer(1, 10))
+                    elements.append(Spacer(1, 0.05*inch))
 
                     # Backtest interpretation
                     interp = Paragraph(
@@ -1683,7 +1679,7 @@ def export_pdf():
         except Exception as e:
             elements.append(Paragraph(f"Backtesting data unavailable: {str(e)}", styles['Normal']))
 
-        elements.append(Spacer(1, 15))
+        elements.append(Spacer(1, 0.15*inch))
 
         # ================== MONTE CARLO SIMULATION ==================
         elements.append(Paragraph("4. MONTE CARLO SIMULATION", heading_style))
@@ -1716,14 +1712,15 @@ def export_pdf():
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                     ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
                     ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (-1, -1), 10),
-                    ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('TOPPADDING', (0, 0), (-1, -1), 3),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
                     ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
                     ('GRID', (0, 0), (-1, -1), 1, colors.black)
                 ]))
 
                 elements.append(mc_table)
-                elements.append(Spacer(1, 15))
+                elements.append(Spacer(1, 0.1*inch))
 
                 # Scenario Analysis
                 elements.append(Paragraph("4.1 Scenario Analysis", subheading_style))
@@ -1755,7 +1752,7 @@ def export_pdf():
         except Exception as e:
             elements.append(Paragraph(f"Monte Carlo simulation unavailable: {str(e)}", styles['Normal']))
 
-        elements.append(PageBreak())
+        elements.append(Spacer(1, 0.15*inch))
 
         # ================== RISK ANALYSIS ==================
         elements.append(Paragraph("5. RISK METRICS", heading_style))
@@ -1841,7 +1838,7 @@ def export_pdf():
 
                 elements.append(risk_table)
 
-        elements.append(Spacer(1, 15))
+        elements.append(Spacer(1, 0.15*inch))
 
         # ================== FEATURE IMPORTANCE ==================
         elements.append(Paragraph("6. FEATURE IMPORTANCE", heading_style))
@@ -1880,7 +1877,7 @@ def export_pdf():
         else:
             elements.append(Paragraph("Feature importance data unavailable.", styles['Normal']))
 
-        elements.append(PageBreak())
+        elements.append(Spacer(1, 0.15*inch))
 
         # ================== RECENT PREDICTIONS ==================
         elements.append(Paragraph("7. RECENT PREDICTIONS (Last 15)", heading_style))
@@ -1915,7 +1912,7 @@ def export_pdf():
 
             elements.append(recent_table)
 
-        elements.append(Spacer(1, 15))
+        elements.append(Spacer(1, 0.15*inch))
 
         # ================== MODEL INFORMATION ==================
         elements.append(Paragraph("8. MODEL INFORMATION", heading_style))
@@ -1938,38 +1935,23 @@ def export_pdf():
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
             ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
             ('GRID', (0, 0), (-1, -1), 1, colors.black)
         ]))
 
         elements.append(model_table)
-        elements.append(Spacer(1, 15))
+        elements.append(Spacer(1, 0.15*inch))
 
         # ================== METHODOLOGY ==================
         elements.append(Paragraph("9. METHODOLOGY & LIMITATIONS", heading_style))
 
-        methodology = """
-        <b>Data Sources:</b> Historical S&P 500 prices from Yahoo Finance, news sentiment from
-        web scraping, economic indicators from public sources.<br/><br/>
-
-        <b>Machine Learning Approach:</b> XGBoost gradient boosting classifier trained on 91 features
-        including RSI, MACD, Bollinger Bands, volume indicators, and sentiment scores.<br/><br/>
-
-        <b>Backtesting:</b> Walk-forward validation on historical data with realistic commission modeling
-        (0.1% per trade) and position sizing strategies.<br/><br/>
-
-        <b>Monte Carlo:</b> Geometric Brownian Motion (GBM) with historical volatility parameters.
-        1000 simulations run for 30-day forecasts.<br/><br/>
-
-        <b>Limitations:</b> Past performance does not guarantee future results. The model assumes
-        market conditions similar to training period. Black swan events and structural market changes
-        are not captured. Always use proper risk management.
-        """
+        methodology = """<b>Data Sources:</b> Historical S&P 500 prices from Yahoo Finance, news sentiment from web scraping, economic indicators from public sources.<br/><br/><b>Machine Learning Approach:</b> XGBoost gradient boosting classifier trained on 91 features including RSI, MACD, Bollinger Bands, volume indicators, and sentiment scores.<br/><br/><b>Backtesting:</b> Walk-forward validation on historical data with realistic commission modeling (0.1% per trade) and position sizing strategies.<br/><br/><b>Monte Carlo:</b> Geometric Brownian Motion (GBM) with historical volatility parameters. 1000 simulations run for 30-day forecasts.<br/><br/><b>Limitations:</b> Past performance does not guarantee future results. The model assumes market conditions similar to training period. Black swan events and structural market changes are not captured. Always use proper risk management."""
 
         elements.append(Paragraph(methodology, styles['Normal']))
-        elements.append(Spacer(1, 20))
+        elements.append(Spacer(1, 0.15*inch))
 
         # ================== DISCLAIMER ==================
         disclaimer_style = ParagraphStyle(
@@ -1995,7 +1977,7 @@ def export_pdf():
         )
         elements.append(disclaimer)
 
-        elements.append(Spacer(1, 15))
+        elements.append(Spacer(1, 0.1*inch))
 
         # Footer
         footer = Paragraph(

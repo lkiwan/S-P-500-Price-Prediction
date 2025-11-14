@@ -22,13 +22,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-COPY requirements.txt requirements_dashboard.txt ./
+COPY requirements_deploy.txt ./
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir -r requirements_dashboard.txt && \
-    pip install --no-cache-dir gunicorn gevent
+    pip install --no-cache-dir -r requirements_deploy.txt
 
 # Copy application code
 COPY . .
