@@ -71,7 +71,7 @@ def get_prediction_history():
         df = pd.read_csv(PREDICTIONS_FILE)
 
         # Convert to datetime
-        df['prediction_date'] = pd.to_datetime(df['prediction_date'])
+        df['prediction_date'] = pd.to_datetime(df['prediction_date'], format='mixed')
 
         # Get last 12 months
         twelve_months_ago = datetime.now() - timedelta(days=365)
