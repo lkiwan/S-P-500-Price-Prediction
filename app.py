@@ -1364,20 +1364,19 @@ def monte_carlo_scenarios():
 
 @app.route('/api/export_pdf')
 def export_pdf():
-    """Generate and export PDF report"""
+    """Generate comprehensive PDF report with all analytics"""
     try:
         from reportlab.lib import colors
-        from reportlab.lib.pagesizes import letter, A4
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, Image
+        from reportlab.lib.pagesizes import letter
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import inch
-        from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
 
         # Create PDF in memory
         buffer = BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+        doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=60, leftMargin=60, topMargin=50, bottomMargin=30)
 
-        # Container for elements
         elements = []
         styles = getSampleStyleSheet()
 
@@ -1385,8 +1384,18 @@ def export_pdf():
         title_style = ParagraphStyle(
             'CustomTitle',
             parent=styles['Heading1'],
-            fontSize=24,
+            fontSize=26,
             textColor=colors.HexColor('#1e40af'),
+            spaceAfter=10,
+            alignment=TA_CENTER,
+            fontName='Helvetica-Bold'
+        )
+
+        subtitle_style = ParagraphStyle(
+            'Subtitle',
+            parent=styles['Normal'],
+            fontSize=12,
+            textColor=colors.HexColor('#6b7280'),
             spaceAfter=30,
             alignment=TA_CENTER
         )
@@ -1396,21 +1405,53 @@ def export_pdf():
             parent=styles['Heading2'],
             fontSize=16,
             textColor=colors.HexColor('#3b82f6'),
-            spaceAfter=12,
-            spaceBefore=12
+            spaceAfter=10,
+            spaceBefore=15,
+            fontName='Helvetica-Bold'
         )
 
-        # Title
-        title = Paragraph("S&P 500 AI Prediction Report", title_style)
+        subheading_style = ParagraphStyle(
+            'SubHeading',
+            parent=styles['Heading3'],
+            fontSize=13,
+            textColor=colors.HexColor('#6366f1'),
+            spaceAfter=8,
+            spaceBefore=10,
+            fontName='Helvetica-Bold'
+        )
+
+        # ================== TITLE PAGE ==================
+        elements.append(Spacer(1, 1.5*inch))
+        title = Paragraph("S&P 500 AI PREDICTION REPORT", title_style)
         elements.append(title)
 
-        # Date
-        date_text = Paragraph(f"<b>Generated:</b> {datetime.now().strftime('%B %d, %Y at %I:%M %p')}", styles['Normal'])
-        elements.append(date_text)
-        elements.append(Spacer(1, 20))
+        subtitle = Paragraph("Comprehensive Analytics & Performance Review", subtitle_style)
+        elements.append(subtitle)
+        elements.append(Spacer(1, 0.3*inch))
 
-        # Latest Prediction Section
-        elements.append(Paragraph("Latest Prediction", heading_style))
+        date_text = Paragraph(
+            f"<b>Report Generated:</b> {datetime.now().strftime('%B %d, %Y at %I:%M %p')}",
+            styles['Normal']
+        )
+        date_text.alignment = TA_CENTER
+        elements.append(date_text)
+        elements.append(Spacer(1, 0.5*inch))
+
+        # Executive Summary Box
+        exec_summary = f"""
+        <para align="justify">
+        This comprehensive report provides a detailed analysis of the S&P 500 AI prediction system's
+        performance, including real-time predictions, backtesting results, Monte Carlo simulations,
+        risk metrics, and feature importance analysis. The system utilizes XGBoost machine learning
+        with 91 technical and sentiment features to predict market direction.
+        </para>
+        """
+        elements.append(Paragraph(exec_summary, styles['Normal']))
+
+        elements.append(PageBreak())
+
+        # ================== LATEST PREDICTION ==================
+        elements.append(Paragraph("1. LATEST PREDICTION", heading_style))
 
         if os.path.exists(PREDICTIONS_FILE):
             pred_df = pd.read_csv(PREDICTIONS_FILE)
@@ -1422,143 +1463,547 @@ def export_pdf():
                     ['Prediction Date', latest['prediction_date']],
                     ['Data Date', latest['data_date']],
                     ['Direction', latest['direction']],
-                    ['Confidence', f"{latest['confidence']*100:.2f}%"],
+                    ['Confidence Score', f"{latest['confidence']*100:.2f}%"],
                     ['Probability UP', f"{latest['prob_up']*100:.2f}%"],
                     ['Probability DOWN', f"{latest['prob_down']*100:.2f}%"]
                 ]
 
-                pred_table = Table(pred_data, colWidths=[2.5*inch, 3*inch])
+                pred_table = Table(pred_data, colWidths=[2.5*inch, 3.5*inch])
                 pred_table.setStyle(TableStyle([
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3b82f6')),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                     ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
                     ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                    ('FONTSIZE', (0, 0), (-1, 0), 12),
-                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('FONTSIZE', (0, 0), (-1, 0), 11),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
                     ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                    ('FONTSIZE', (0, 1), (-1, -1), 10)
                 ]))
 
                 elements.append(pred_table)
-                elements.append(Spacer(1, 20))
+                elements.append(Spacer(1, 15))
 
-        # Accuracy Statistics
+        # ================== PERFORMANCE METRICS ==================
+        elements.append(Paragraph("2. PERFORMANCE METRICS", heading_style))
+
         if os.path.exists('predictions_with_accuracy.csv'):
-            elements.append(Paragraph("Accuracy Statistics", heading_style))
-
             df = pd.read_csv('predictions_with_accuracy.csv')
             total = len(df)
             correct = df['is_correct'].sum()
             accuracy = (correct / total) * 100 if total > 0 else 0
 
-            # High/Medium/Low confidence breakdown
+            # Overall stats
+            elements.append(Paragraph("2.1 Overall Accuracy", subheading_style))
+
             high_conf = df[df['confidence'] >= 0.70]
             medium_conf = df[(df['confidence'] >= 0.60) & (df['confidence'] < 0.70)]
             low_conf = df[df['confidence'] < 0.60]
 
             acc_data = [
-                ['Category', 'Accuracy', 'Predictions'],
-                ['Overall', f'{accuracy:.2f}%', f'{correct}/{total}'],
-                ['High Confidence (>70%)',
+                ['Category', 'Accuracy', 'Correct/Total', 'Win Rate'],
+                ['Overall Performance', f'{accuracy:.2f}%', f'{correct}/{total}', f'{accuracy:.1f}%'],
+                ['High Confidence (≥70%)',
                  f'{(high_conf["is_correct"].sum()/len(high_conf)*100):.2f}%' if len(high_conf) > 0 else 'N/A',
-                 f'{len(high_conf)}'],
+                 f'{high_conf["is_correct"].sum()}/{len(high_conf)}' if len(high_conf) > 0 else 'N/A',
+                 f'{(high_conf["is_correct"].sum()/len(high_conf)*100):.1f}%' if len(high_conf) > 0 else 'N/A'],
                 ['Medium Confidence (60-70%)',
                  f'{(medium_conf["is_correct"].sum()/len(medium_conf)*100):.2f}%' if len(medium_conf) > 0 else 'N/A',
-                 f'{len(medium_conf)}'],
+                 f'{medium_conf["is_correct"].sum()}/{len(medium_conf)}' if len(medium_conf) > 0 else 'N/A',
+                 f'{(medium_conf["is_correct"].sum()/len(medium_conf)*100):.1f}%' if len(medium_conf) > 0 else 'N/A'],
                 ['Low Confidence (<60%)',
                  f'{(low_conf["is_correct"].sum()/len(low_conf)*100):.2f}%' if len(low_conf) > 0 else 'N/A',
-                 f'{len(low_conf)}']
+                 f'{low_conf["is_correct"].sum()}/{len(low_conf)}' if len(low_conf) > 0 else 'N/A',
+                 f'{(low_conf["is_correct"].sum()/len(low_conf)*100):.1f}%' if len(low_conf) > 0 else 'N/A']
             ]
 
-            acc_table = Table(acc_data, colWidths=[2.5*inch, 1.5*inch, 1.5*inch])
+            acc_table = Table(acc_data, colWidths=[2*inch, 1.3*inch, 1.3*inch, 1.3*inch])
             acc_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#10b981')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 11),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
                 ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
                 ('GRID', (0, 0), (-1, -1), 1, colors.black)
             ]))
 
             elements.append(acc_table)
-            elements.append(Spacer(1, 20))
+            elements.append(Spacer(1, 15))
 
-            # Recent Predictions
-            elements.append(Paragraph("Recent Predictions (Last 10)", heading_style))
+            # Confusion Matrix
+            elements.append(Paragraph("2.2 Confusion Matrix", subheading_style))
 
-            recent_df = df.tail(10).sort_values('prediction_date', ascending=False)
+            # Calculate confusion matrix
+            df_eval = df.dropna(subset=['actual_direction'])
+            true_up = ((df_eval['predicted_direction'] == 'UP') & (df_eval['actual_direction'] == 'UP')).sum()
+            false_up = ((df_eval['predicted_direction'] == 'UP') & (df_eval['actual_direction'] == 'DOWN')).sum()
+            true_down = ((df_eval['predicted_direction'] == 'DOWN') & (df_eval['actual_direction'] == 'DOWN')).sum()
+            false_down = ((df_eval['predicted_direction'] == 'DOWN') & (df_eval['actual_direction'] == 'UP')).sum()
 
-            recent_data = [['Date', 'Predicted', 'Actual', 'Result', 'Return']]
+            total_pred = true_up + false_up + true_down + false_down
+            if total_pred > 0:
+                precision = true_up / (true_up + false_up) if (true_up + false_up) > 0 else 0
+                recall = true_up / (true_up + false_down) if (true_up + false_down) > 0 else 0
+                f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+
+                conf_data = [
+                    ['Metric', 'Value'],
+                    ['True Positives (UP correct)', str(true_up)],
+                    ['False Positives (UP wrong)', str(false_up)],
+                    ['True Negatives (DOWN correct)', str(true_down)],
+                    ['False Negatives (DOWN wrong)', str(false_down)],
+                    ['Precision', f'{precision*100:.2f}%'],
+                    ['Recall', f'{recall*100:.2f}%'],
+                    ['F1 Score', f'{f1*100:.2f}%']
+                ]
+
+                conf_table = Table(conf_data, colWidths=[3*inch, 2*inch])
+                conf_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#8b5cf6')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ]))
+
+                elements.append(conf_table)
+                elements.append(Spacer(1, 15))
+
+            # Best and Worst Predictions
+            elements.append(Paragraph("2.3 Best & Worst Predictions", subheading_style))
+
+            df_sorted = df[df['is_correct'] == True].nlargest(3, 'actual_return')
+            df_worst = df[df['is_correct'] == False].nsmallest(3, 'actual_return')
+
+            best_worst_data = [['Type', 'Date', 'Predicted', 'Confidence', 'Return']]
+
+            for _, row in df_sorted.iterrows():
+                best_worst_data.append([
+                    'Best ✓',
+                    row['data_date'][:10],
+                    row['predicted_direction'],
+                    f"{row['confidence']*100:.1f}%",
+                    f"{row['actual_return']:+.2f}%"
+                ])
+
+            for _, row in df_worst.iterrows():
+                best_worst_data.append([
+                    'Worst ✗',
+                    row['data_date'][:10],
+                    row['predicted_direction'],
+                    f"{row['confidence']*100:.1f}%",
+                    f"{row['actual_return']:+.2f}%"
+                ])
+
+            bw_table = Table(best_worst_data, colWidths=[1*inch, 1.2*inch, 1.2*inch, 1.2*inch, 1.2*inch])
+            bw_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f59e0b')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+
+            elements.append(bw_table)
+
+        elements.append(PageBreak())
+
+        # ================== BACKTESTING RESULTS ==================
+        elements.append(Paragraph("3. BACKTESTING RESULTS", heading_style))
+        elements.append(Paragraph("Strategy Performance Comparison", subheading_style))
+
+        try:
+            from src.models.backtester import Backtester
+            backtester = Backtester()
+
+            if os.path.exists('predictions_with_accuracy.csv') and os.path.exists('data/processed/sp500_prices.csv'):
+                predictions_df = pd.read_csv('predictions_with_accuracy.csv')
+                price_df = pd.read_csv('data/processed/sp500_prices.csv')
+
+                strategies = {
+                    'Simple (50%)': ('simple', 0.5),
+                    'Confidence-Based': ('confidence', None),
+                    'Kelly Criterion': ('kelly', None),
+                    'Conservative (25%)': ('simple', 0.25),
+                    'Aggressive (100%)': ('simple', 1.0)
+                }
+
+                backtest_data = [['Strategy', 'Return %', 'Sharpe', 'Max DD %', 'Win Rate %', 'Trades']]
+
+                for name, (strategy, size) in strategies.items():
+                    try:
+                        if size is not None:
+                            result = backtester.run_strategy(predictions_df, price_df, strategy=strategy, position_size=size)
+                        else:
+                            result = backtester.run_strategy(predictions_df, price_df, strategy=strategy)
+
+                        backtest_data.append([
+                            name,
+                            f"{result['total_return_pct']:+.2f}%",
+                            f"{result['sharpe_ratio']:.2f}",
+                            f"{result['max_drawdown_pct']:.2f}%",
+                            f"{result['win_rate_pct']:.1f}%",
+                            str(result['total_trades'])
+                        ])
+                    except:
+                        pass
+
+                if len(backtest_data) > 1:
+                    bt_table = Table(backtest_data, colWidths=[1.6*inch, 1*inch, 0.8*inch, 0.9*inch, 1*inch, 0.8*inch])
+                    bt_table.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#ef4444')),
+                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                        ('FONTSIZE', (0, 0), (-1, -1), 9),
+                        ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+                        ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
+                        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                    ]))
+
+                    elements.append(bt_table)
+                    elements.append(Spacer(1, 10))
+
+                    # Backtest interpretation
+                    interp = Paragraph(
+                        "<i>Note: Backtesting results show how different position sizing strategies would have "
+                        "performed historically. Higher Sharpe ratio indicates better risk-adjusted returns.</i>",
+                        styles['Normal']
+                    )
+                    elements.append(interp)
+        except Exception as e:
+            elements.append(Paragraph(f"Backtesting data unavailable: {str(e)}", styles['Normal']))
+
+        elements.append(Spacer(1, 15))
+
+        # ================== MONTE CARLO SIMULATION ==================
+        elements.append(Paragraph("4. MONTE CARLO SIMULATION", heading_style))
+        elements.append(Paragraph("30-Day Price Forecast (1000 simulations)", subheading_style))
+
+        try:
+            from src.models.monte_carlo import MonteCarloSimulator
+
+            if os.path.exists('data/processed/sp500_prices.csv'):
+                price_df = pd.read_csv('data/processed/sp500_prices.csv')
+                mc_sim = MonteCarloSimulator(price_df)
+                mc_result = mc_sim.simulate_price_paths(days=30, num_simulations=1000)
+
+                mc_data = [
+                    ['Metric', 'Value'],
+                    ['Current Price', f"${mc_result['current_price']:.2f}"],
+                    ['Expected Price (30d)', f"${mc_result['final_price_stats']['mean']:.2f}"],
+                    ['Median Price (30d)', f"${mc_result['final_price_stats']['median']:.2f}"],
+                    ['95th Percentile', f"${mc_result['percentiles']['95th']:.2f}"],
+                    ['5th Percentile', f"${mc_result['percentiles']['5th']:.2f}"],
+                    ['Probability of Profit', f"{mc_result['prob_profit_pct']:.1f}%"],
+                    ['Expected Return', f"{mc_result['expected_return_pct']:+.2f}%"],
+                    ['Value at Risk (VaR 95%)', f"{mc_result['var_95_pct']:.2f}%"],
+                    ['Conditional VaR (CVaR)', f"{mc_result['cvar_95_pct']:.2f}%"]
+                ]
+
+                mc_table = Table(mc_data, colWidths=[2.5*inch, 2*inch])
+                mc_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#14b8a6')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 10),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ]))
+
+                elements.append(mc_table)
+                elements.append(Spacer(1, 15))
+
+                # Scenario Analysis
+                elements.append(Paragraph("4.1 Scenario Analysis", subheading_style))
+
+                scenarios = mc_sim.run_scenario_analysis()
+                scenario_data = [['Scenario', 'Expected Return', 'Prob of Profit', 'VaR 95%']]
+
+                for scenario_name, scenario_result in scenarios['scenarios'].items():
+                    scenario_data.append([
+                        scenario_name,
+                        f"{scenario_result['expected_return_pct']:+.2f}%",
+                        f"{scenario_result['prob_profit_pct']:.1f}%",
+                        f"{scenario_result['var_95_pct']:.2f}%"
+                    ])
+
+                scenario_table = Table(scenario_data, colWidths=[1.8*inch, 1.5*inch, 1.5*inch, 1.5*inch])
+                scenario_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#06b6d4')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ]))
+
+                elements.append(scenario_table)
+        except Exception as e:
+            elements.append(Paragraph(f"Monte Carlo simulation unavailable: {str(e)}", styles['Normal']))
+
+        elements.append(PageBreak())
+
+        # ================== RISK ANALYSIS ==================
+        elements.append(Paragraph("5. RISK METRICS", heading_style))
+
+        if os.path.exists('predictions_with_accuracy.csv'):
+            df = pd.read_csv('predictions_with_accuracy.csv')
+
+            # Calculate risk metrics
+            returns = df['actual_return'].dropna()
+            if len(returns) > 0:
+                # Calculate cumulative returns for max drawdown
+                cumulative = (1 + returns/100).cumprod()
+                running_max = cumulative.expanding().max()
+                drawdown = (cumulative - running_max) / running_max * 100
+                max_dd = drawdown.min()
+
+                # Sharpe ratio
+                if returns.std() != 0:
+                    sharpe = (returns.mean() / returns.std()) * np.sqrt(252)
+                else:
+                    sharpe = 0
+
+                # Win streaks
+                df['is_correct'] = df['is_correct'].fillna(False)
+                streaks = []
+                current_streak = 0
+                for correct in df['is_correct']:
+                    if correct:
+                        current_streak += 1
+                    else:
+                        if current_streak > 0:
+                            streaks.append(current_streak)
+                        current_streak = 0
+                if current_streak > 0:
+                    streaks.append(current_streak)
+
+                longest_win = max(streaks) if streaks else 0
+
+                # Loss streaks
+                loss_streaks = []
+                current_loss = 0
+                for correct in df['is_correct']:
+                    if not correct:
+                        current_loss += 1
+                    else:
+                        if current_loss > 0:
+                            loss_streaks.append(current_loss)
+                        current_loss = 0
+                if current_loss > 0:
+                    loss_streaks.append(current_loss)
+
+                longest_loss = max(loss_streaks) if loss_streaks else 0
+
+                # Average win/loss
+                wins = returns[df['is_correct'] == True]
+                losses = returns[df['is_correct'] == False]
+                avg_win = wins.mean() if len(wins) > 0 else 0
+                avg_loss = losses.mean() if len(losses) > 0 else 0
+
+                risk_data = [
+                    ['Risk Metric', 'Value', 'Interpretation'],
+                    ['Maximum Drawdown', f'{max_dd:.2f}%', 'Largest peak-to-trough decline'],
+                    ['Sharpe Ratio', f'{sharpe:.2f}', 'Risk-adjusted return measure'],
+                    ['Longest Win Streak', f'{longest_win} predictions', 'Best consecutive streak'],
+                    ['Longest Loss Streak', f'{longest_loss} predictions', 'Worst consecutive streak'],
+                    ['Average Win', f'{avg_win:+.2f}%', 'Mean return on correct predictions'],
+                    ['Average Loss', f'{avg_loss:.2f}%', 'Mean return on incorrect predictions'],
+                    ['Win/Loss Ratio', f'{abs(avg_win/avg_loss):.2f}' if avg_loss != 0 else 'N/A', 'Profit factor indicator']
+                ]
+
+                risk_table = Table(risk_data, colWidths=[2*inch, 1.3*inch, 2.7*inch])
+                risk_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#dc2626')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (1, -1), 'LEFT'),
+                    ('ALIGN', (2, 0), (2, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ]))
+
+                elements.append(risk_table)
+
+        elements.append(Spacer(1, 15))
+
+        # ================== FEATURE IMPORTANCE ==================
+        elements.append(Paragraph("6. FEATURE IMPORTANCE", heading_style))
+        elements.append(Paragraph("Top 15 Features Driving Predictions", subheading_style))
+
+        # Load feature importance
+        model_name = 'sp500_complete_20251113'
+        importance_file = f'models/{model_name}_feature_importance.csv'
+
+        if os.path.exists(importance_file):
+            feat_df = pd.read_csv(importance_file).head(15)
+
+            feat_data = [['Rank', 'Feature Name', 'Importance', 'Impact']]
+            for idx, row in feat_df.iterrows():
+                feat_data.append([
+                    str(idx + 1),
+                    row['feature'][:30],
+                    f"{row['importance']:.4f}",
+                    f"{row['importance']*100:.2f}%"
+                ])
+
+            feat_table = Table(feat_data, colWidths=[0.6*inch, 2.8*inch, 1.3*inch, 1.3*inch])
+            feat_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#7c3aed')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('ALIGN', (1, 1), (1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+
+            elements.append(feat_table)
+        else:
+            elements.append(Paragraph("Feature importance data unavailable.", styles['Normal']))
+
+        elements.append(PageBreak())
+
+        # ================== RECENT PREDICTIONS ==================
+        elements.append(Paragraph("7. RECENT PREDICTIONS (Last 15)", heading_style))
+
+        if os.path.exists('predictions_with_accuracy.csv'):
+            df = pd.read_csv('predictions_with_accuracy.csv')
+            recent_df = df.tail(15).sort_values('prediction_date', ascending=False)
+
+            recent_data = [['Date', 'Predicted', 'Actual', 'Result', 'Conf.', 'Return']]
             for _, row in recent_df.iterrows():
-                result = '✓ Correct' if row['is_correct'] else '✗ Wrong'
+                result = '✓' if row['is_correct'] else '✗'
                 recent_data.append([
                     row['data_date'][:10],
                     row['predicted_direction'],
                     row['actual_direction'],
                     result,
+                    f"{row['confidence']*100:.1f}%",
                     f"{row['actual_return']:+.2f}%"
                 ])
 
-            recent_table = Table(recent_data, colWidths=[1.2*inch, 1*inch, 1*inch, 1.2*inch, 1.1*inch])
+            recent_table = Table(recent_data, colWidths=[1.1*inch, 0.9*inch, 0.9*inch, 0.7*inch, 0.9*inch, 0.9*inch])
             recent_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6366f1')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, -1), 9),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
                 ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
                 ('GRID', (0, 0), (-1, -1), 1, colors.black)
             ]))
 
             elements.append(recent_table)
 
-        # Model Information
-        elements.append(PageBreak())
-        elements.append(Paragraph("Model Information", heading_style))
+        elements.append(Spacer(1, 15))
+
+        # ================== MODEL INFORMATION ==================
+        elements.append(Paragraph("8. MODEL INFORMATION", heading_style))
 
         model_info = [
             ['Parameter', 'Value'],
-            ['Model Type', 'XGBoost Classifier'],
-            ['Model Name', 'sp500_complete_20251113'],
-            ['Features', '91 technical and sentiment indicators'],
-            ['Training Period', '2020-2024'],
-            ['Update Frequency', 'Daily']
+            ['Model Type', 'XGBoost Classifier (Gradient Boosting)'],
+            ['Model Version', 'sp500_complete_20251113'],
+            ['Total Features', '91 (Technical + Sentiment + Economic)'],
+            ['Feature Categories', 'Price action, Momentum, Volatility, Volume, News sentiment'],
+            ['Training Period', '2020-2024 (4+ years of data)'],
+            ['Update Frequency', 'Daily (automated predictions)'],
+            ['Confidence Threshold', '60% (Medium confidence minimum)'],
+            ['Target Variable', 'Next-day market direction (UP/DOWN)']
         ]
 
-        model_table = Table(model_info, colWidths=[2.5*inch, 3*inch])
+        model_table = Table(model_info, colWidths=[2.3*inch, 3.7*inch])
         model_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#8b5cf6')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 11),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
             ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
             ('GRID', (0, 0), (-1, -1), 1, colors.black)
         ]))
 
         elements.append(model_table)
+        elements.append(Spacer(1, 15))
+
+        # ================== METHODOLOGY ==================
+        elements.append(Paragraph("9. METHODOLOGY & LIMITATIONS", heading_style))
+
+        methodology = """
+        <b>Data Sources:</b> Historical S&P 500 prices from Yahoo Finance, news sentiment from
+        web scraping, economic indicators from public sources.<br/><br/>
+
+        <b>Machine Learning Approach:</b> XGBoost gradient boosting classifier trained on 91 features
+        including RSI, MACD, Bollinger Bands, volume indicators, and sentiment scores.<br/><br/>
+
+        <b>Backtesting:</b> Walk-forward validation on historical data with realistic commission modeling
+        (0.1% per trade) and position sizing strategies.<br/><br/>
+
+        <b>Monte Carlo:</b> Geometric Brownian Motion (GBM) with historical volatility parameters.
+        1000 simulations run for 30-day forecasts.<br/><br/>
+
+        <b>Limitations:</b> Past performance does not guarantee future results. The model assumes
+        market conditions similar to training period. Black swan events and structural market changes
+        are not captured. Always use proper risk management.
+        """
+
+        elements.append(Paragraph(methodology, styles['Normal']))
         elements.append(Spacer(1, 20))
 
-        # Disclaimer
-        elements.append(Spacer(1, 30))
+        # ================== DISCLAIMER ==================
         disclaimer_style = ParagraphStyle(
             'Disclaimer',
             parent=styles['Normal'],
             fontSize=9,
-            textColor=colors.grey,
-            alignment=TA_CENTER
+            textColor=colors.HexColor('#ef4444'),
+            alignment=TA_JUSTIFY,
+            borderColor=colors.HexColor('#ef4444'),
+            borderWidth=1,
+            borderPadding=10
         )
+
         disclaimer = Paragraph(
-            "<b>DISCLAIMER:</b> This report is for informational purposes only. "
-            "Past performance does not guarantee future results. "
-            "Always conduct your own research before making investment decisions.",
+            "<b>IMPORTANT DISCLAIMER:</b> This report is for educational and informational purposes only. "
+            "It does not constitute financial advice, investment recommendations, or an offer to buy or sell securities. "
+            "Trading and investing involve substantial risk of loss. Past performance does not guarantee future results. "
+            "The predictions and analysis provided are based on historical data and mathematical models that may not "
+            "reflect future market conditions. Always conduct your own research and consult with a licensed financial "
+            "advisor before making any investment decisions. The creators of this system are not responsible for any "
+            "financial losses incurred from using this information.",
             disclaimer_style
         )
         elements.append(disclaimer)
+
+        elements.append(Spacer(1, 15))
+
+        # Footer
+        footer = Paragraph(
+            f"<i>Report generated by S&P 500 AI Prediction System | {datetime.now().strftime('%B %d, %Y')}</i>",
+            styles['Normal']
+        )
+        footer.alignment = TA_CENTER
+        elements.append(footer)
 
         # Build PDF
         doc.build(elements)
@@ -1567,7 +2012,7 @@ def export_pdf():
         return send_file(
             buffer,
             as_attachment=True,
-            download_name=f'SP500_Prediction_Report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf',
+            download_name=f'SP500_Comprehensive_Report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf',
             mimetype='application/pdf'
         )
 
