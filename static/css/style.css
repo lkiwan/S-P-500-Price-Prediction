@@ -195,6 +195,7 @@ body::before {
     border-left: 5px solid var(--primary);
     position: relative;
     overflow: hidden;
+    min-height: 120px;
 }
 
 .market-hours-box {
@@ -206,6 +207,44 @@ body::before {
 .market-hours-box:hover {
     background: rgba(255, 255, 255, 0.8);
     transform: scale(1.02);
+}
+
+/* Loading & Error States for Market Status */
+#market-loading {
+    color: #667eea;
+    font-weight: 500;
+    animation: pulse-text 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-text {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+#market-error {
+    animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+}
+
+/* Price Update Animation */
+.price-update-animation {
+    animation: price-flash 0.6s ease;
+}
+
+@keyframes price-flash {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 0.8;
+    }
 }
 
 .market-status-badge {
@@ -291,6 +330,9 @@ body::before {
     -webkit-text-fill-color: transparent;
     background-clip: text;
     animation: price-pulse 2s ease-in-out infinite;
+    white-space: nowrap;
+    overflow: visible;
+    line-height: 1.2;
 }
 
 @keyframes price-pulse {
@@ -674,6 +716,11 @@ body::before {
     cursor: pointer;
     position: relative;
     overflow: hidden;
+    border: 2px solid transparent;
+    min-height: 140px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .indicator-box::before {
@@ -685,6 +732,7 @@ body::before {
     height: 100%;
     background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
     transition: left 0.5s;
+    z-index: 0;
 }
 
 .indicator-box:hover::before {
@@ -692,17 +740,74 @@ body::before {
 }
 
 .indicator-box:hover {
-    transform: translateY(-5px) scale(1.05);
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+    transform: translateY(-8px) scale(1.05);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
     background: white !important;
+    border-color: rgba(102, 126, 234, 0.3);
+}
+
+.indicator-icon {
+    font-size: 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.indicator-box:hover .indicator-icon i {
+    transform: scale(1.2) rotate(10deg);
+}
+
+.indicator-label {
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.indicator-value {
+    transition: all 0.3s ease;
+    position: relative;
+    z-index: 1;
 }
 
 .indicator-change {
     transition: all 0.3s ease;
+    font-weight: 600;
+    position: relative;
+    z-index: 1;
+}
+
+.indicator-box:hover .indicator-value {
+    transform: scale(1.1);
 }
 
 .indicator-box:hover .indicator-change {
-    transform: scale(1.2);
+    transform: scale(1.15);
+}
+
+/* Indicator Update Pulse Animation */
+.indicator-update-pulse {
+    animation: indicator-pulse 0.6s ease;
+}
+
+@keyframes indicator-pulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.15);
+        opacity: 0.8;
+    }
+}
+
+/* Loading State for Indicators */
+#indicators-loading {
+    color: #667eea;
+    font-weight: 500;
+    animation: pulse-text 1.5s ease-in-out infinite;
+}
+
+/* Error State for Indicators */
+#indicators-error {
+    animation: shake 0.5s ease-in-out;
 }
 
 /* ================================
@@ -777,7 +882,7 @@ body::before {
 
 @media (max-width: 768px) {
     #current-price {
-        font-size: 2rem;
+        font-size: 1.75rem;
     }
 
     .prediction-icon {
@@ -803,6 +908,185 @@ body::before {
 
     .navbar-brand {
         font-size: 1.25rem;
+    }
+
+    /* Market Status Mobile Optimizations */
+    .market-status-card {
+        min-height: auto;
+    }
+
+    .market-status-card .card-body {
+        padding: 1rem !important;
+    }
+
+    #price-change .badge {
+        font-size: 1rem;
+        padding: 0.5rem 1rem;
+    }
+
+    .market-hours-box {
+        padding: 0.75rem !important;
+    }
+
+    .market-status-badge {
+        font-size: 0.75rem;
+        padding: 0.4rem 0.8rem;
+    }
+
+    .btn-lg {
+        padding: 0.75rem 1.5rem;
+        font-size: 0.95rem;
+    }
+
+    .market-status-card h5 {
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 576px) {
+    #current-price {
+        font-size: 1.35rem;
+        letter-spacing: -0.5px;
+    }
+
+    #price-change .badge {
+        font-size: 0.9rem;
+        padding: 0.4rem 0.8rem;
+    }
+
+    .btn-lg {
+        padding: 0.6rem 1.25rem;
+        font-size: 0.875rem;
+    }
+
+    .market-hours-box {
+        padding: 0.5rem !important;
+        font-size: 0.85rem;
+    }
+
+    .market-status-badge {
+        font-size: 0.7rem;
+        padding: 0.35rem 0.7rem;
+    }
+}
+
+@media (max-width: 400px) {
+    #current-price {
+        font-size: 1.25rem;
+        letter-spacing: -1px;
+    }
+
+    .indicator-box {
+        min-height: 110px;
+        padding: 0.5rem !important;
+    }
+
+    .indicator-icon {
+        font-size: 1.2rem;
+    }
+
+    .indicator-value {
+        font-size: 1rem !important;
+    }
+}
+
+/* ================================
+   Candlestick Chart - Styling
+   ================================ */
+
+#candlestick-container {
+    position: relative;
+}
+
+#candlestick-loading {
+    color: #667eea;
+    font-weight: 500;
+    animation: pulse-text 1.5s ease-in-out infinite;
+}
+
+#candlestick-error {
+    animation: shake 0.5s ease-in-out;
+}
+
+.period-selector .btn {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-weight: 600;
+    min-width: 50px;
+    position: relative;
+    overflow: hidden;
+}
+
+.period-selector .btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(102, 126, 234, 0.2);
+    transform: translate(-50%, -50%);
+    transition: width 0.4s, height 0.4s;
+}
+
+.period-selector .btn:hover::before {
+    width: 200px;
+    height: 200px;
+}
+
+.period-selector .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.period-selector .btn.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: #667eea;
+    color: white;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.period-selector .btn.active:hover {
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+}
+
+/* Tablet & Mobile Optimizations for Indicators */
+@media (max-width: 768px) {
+    .indicator-box {
+        min-height: 120px;
+    }
+
+    .indicator-icon {
+        font-size: 1.3rem;
+    }
+
+    .indicator-value {
+        font-size: 1.1rem !important;
+    }
+
+    .indicator-label {
+        font-size: 0.75rem;
+    }
+
+    .indicator-change {
+        font-size: 0.8rem;
+    }
+
+    .period-selector .btn {
+        min-width: 40px;
+        padding: 0.4rem 0.6rem;
+        font-size: 0.8rem;
+    }
+}
+
+/* Desktop Enhancements */
+@media (min-width: 1200px) {
+    .indicator-box {
+        min-height: 150px;
+    }
+
+    .indicator-icon {
+        font-size: 1.75rem;
     }
 }
 
@@ -995,4 +1279,333 @@ body.dark-theme ::-webkit-scrollbar-thumb:hover {
 
 #theme-toggle:hover #theme-icon {
     transform: rotate(20deg);
+}
+
+/* ================================
+   Trading Simulation - Enhanced Styling
+   ================================ */
+
+/* Metric boxes with glassmorphism and animations */
+.metric-box {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(10px);
+}
+
+.metric-box::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.metric-box:hover {
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 12px 24px rgba(102, 126, 234, 0.2) !important;
+    border-color: rgba(102, 126, 234, 0.4);
+}
+
+.metric-box:hover::before {
+    opacity: 1;
+}
+
+.metric-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #6b7280;
+    margin-bottom: 0.5rem;
+}
+
+.metric-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    line-height: 1.2;
+    transition: all 0.3s ease;
+}
+
+.metric-box:hover .metric-value {
+    transform: scale(1.1);
+    color: #667eea;
+}
+
+/* Success and info colored boxes */
+.bg-success.bg-opacity-10 .metric-value {
+    color: #10b981;
+}
+
+.bg-info.bg-opacity-10 .metric-value {
+    color: #3b82f6;
+}
+
+.bg-success.bg-opacity-10:hover .metric-value,
+.bg-info.bg-opacity-10:hover .metric-value {
+    filter: brightness(1.2);
+}
+
+/* Capital Growth Chart Container */
+#capitalGrowthChart {
+    position: relative;
+    animation: chartFadeIn 0.8s ease forwards;
+}
+
+@keyframes chartFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Performance comparison row */
+.d-flex.justify-content-between.align-items-center {
+    padding: 0.5rem 0;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.d-flex.justify-content-between.align-items-center:hover {
+    background: rgba(102, 126, 234, 0.05);
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+}
+
+/* Enhanced text colors for returns */
+.text-success {
+    color: #10b981 !important;
+    font-weight: 700;
+}
+
+.text-danger {
+    color: #ef4444 !important;
+    font-weight: 700;
+}
+
+.text-info {
+    color: #3b82f6 !important;
+    font-weight: 700;
+}
+
+/* Pulsing animation for positive returns */
+@keyframes pulse-glow-success {
+    0%, 100% {
+        text-shadow: 0 0 0 rgba(16, 185, 129, 0);
+    }
+    50% {
+        text-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+    }
+}
+
+.text-success.fw-bold {
+    animation: pulse-glow-success 2s ease-in-out infinite;
+}
+
+/* Number formatting with monospace */
+.metric-value,
+#sim-initial-capital,
+#sim-final-capital,
+#sim-total-return,
+#sim-win-rate,
+#sim-model-return,
+#sim-buyhold-return,
+#sim-outperformance {
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Droid Sans Mono', monospace;
+    letter-spacing: -0.5px;
+}
+
+/* Trading Simulation Card */
+.card:has(#capitalGrowthChart) {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.95) 100%);
+    border-left: 4px solid #10b981;
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+    .metric-box {
+        margin-bottom: 0.75rem;
+    }
+
+    .metric-value {
+        font-size: 1.25rem;
+    }
+
+    .metric-label {
+        font-size: 0.7rem;
+    }
+
+    .d-flex.justify-content-between.align-items-center {
+        font-size: 0.875rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .metric-value {
+        font-size: 1.1rem;
+    }
+
+    .row.g-3 {
+        --bs-gutter-x: 0.5rem;
+        --bs-gutter-y: 0.5rem;
+    }
+}
+
+/* Loading state for simulation */
+.metric-box.loading {
+    animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-loading {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Dark theme support for Trading Simulation */
+body.dark-theme .metric-box {
+    background: rgba(51, 65, 85, 0.4) !important;
+    border-color: rgba(148, 163, 184, 0.2);
+}
+
+body.dark-theme .metric-box:hover {
+    background: rgba(51, 65, 85, 0.6) !important;
+    border-color: rgba(102, 126, 234, 0.5);
+}
+
+body.dark-theme .metric-label {
+    color: #94a3b8;
+}
+
+body.dark-theme .metric-value {
+    color: #e2e8f0;
+}
+
+body.dark-theme .card:has(#capitalGrowthChart) {
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.95) 100%);
+    border-left-color: #10b981;
+}
+
+/* ================================
+   Recent Predictions - Pending Row
+   ================================ */
+
+/* Pending prediction row - Highlight for next day prediction */
+.pending-prediction-row {
+    background: linear-gradient(90deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%) !important;
+    border-left: 4px solid #6366f1;
+    position: relative;
+    animation: pending-glow 3s ease-in-out infinite;
+}
+
+.pending-prediction-row:hover {
+    background: linear-gradient(90deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%) !important;
+    transform: scale(1.01);
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.2);
+}
+
+@keyframes pending-glow {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 15px 2px rgba(99, 102, 241, 0.2);
+    }
+}
+
+/* Pulse animation for pending prediction direction badge */
+.pulse-animation {
+    animation: pulse-badge 2s ease-in-out infinite;
+}
+
+@keyframes pulse-badge {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 0 10px 3px rgba(99, 102, 241, 0.3);
+    }
+}
+
+/* Enhanced Recent Predictions Table */
+#predictions-table {
+    position: relative;
+}
+
+#predictions-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+}
+
+/* Table row transitions */
+#predictions-tbody tr {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Alternating row colors for better readability */
+#predictions-tbody tr:not(.pending-prediction-row):nth-child(even) {
+    background: rgba(248, 250, 252, 0.5);
+}
+
+/* Better hover state for completed predictions */
+#predictions-tbody tr:not(.pending-prediction-row):hover {
+    background: linear-gradient(90deg, rgba(102, 126, 234, 0.06) 0%, rgba(118, 75, 162, 0.06) 100%);
+}
+
+/* Separator after pending prediction */
+.pending-prediction-row::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent 0%, #6366f1 50%, transparent 100%);
+}
+
+/* Dark theme support for pending predictions */
+body.dark-theme .pending-prediction-row {
+    background: linear-gradient(90deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%) !important;
+    border-left-color: #818cf8;
+}
+
+body.dark-theme .pending-prediction-row:hover {
+    background: linear-gradient(90deg, rgba(99, 102, 241, 0.25) 0%, rgba(139, 92, 246, 0.25) 100%) !important;
+}
+
+body.dark-theme #predictions-table thead {
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.95) 100%);
+}
+
+body.dark-theme #predictions-tbody tr:not(.pending-prediction-row):nth-child(even) {
+    background: rgba(30, 41, 59, 0.3);
+}
+
+/* Mobile responsiveness for predictions table */
+@media (max-width: 768px) {
+    .pending-prediction-row td {
+        font-size: 0.875rem;
+        padding: 0.75rem 0.5rem;
+    }
+
+    .pending-prediction-row .badge {
+        font-size: 0.65rem;
+        padding: 0.25rem 0.5rem;
+    }
 }

@@ -42,11 +42,12 @@ except Exception as e:
 
 # Helper functions for database/CSV access
 def get_predictions_data():
-    """Get predictions from database or CSV fallback"""
-    if db:
-        return db.get_predictions()
-    elif os.path.exists(PREDICTIONS_FILE):
+    """Get predictions from database or CSV fallback (prioritizes CSV for local dev)"""
+    # Prioritize CSV file for local development (has freshest data)
+    if os.path.exists(PREDICTIONS_FILE):
         return pd.read_csv(PREDICTIONS_FILE)
+    elif db:
+        return db.get_predictions()
     return pd.DataFrame()
 
 
@@ -69,21 +70,22 @@ def dashboard():
 def get_latest_prediction():
     """Get the latest prediction"""
     try:
-        if os.path.exists(PREDICTIONS_FILE):
-            df = pd.read_csv(PREDICTIONS_FILE)
-            if len(df) > 0:
-                latest = df.iloc[-1].to_dict()
-                return jsonify({
-                    'success': True,
-                    'prediction': {
-                        'date': latest['prediction_date'],
-                        'data_date': latest['data_date'],
-                        'direction': latest['direction'],
-                        'confidence': float(latest['confidence']),
-                        'prob_up': float(latest['prob_up']),
-                        'prob_down': float(latest['prob_down'])
-                    }
-                })
+        # Get predictions from database (or CSV fallback)
+        df = get_predictions_data()
+
+        if len(df) > 0:
+            latest = df.iloc[-1].to_dict()
+            return jsonify({
+                'success': True,
+                'prediction': {
+                    'date': latest['prediction_date'],
+                    'data_date': latest['data_date'],
+                    'direction': latest['direction'],
+                    'confidence': float(latest['confidence']),
+                    'prob_up': float(latest['prob_up']),
+                    'prob_down': float(latest['prob_down'])
+                }
+            })
 
         return jsonify({'success': False, 'message': 'No predictions yet'})
 
@@ -406,28 +408,106 @@ def get_accuracy_stats():
 
 @app.route('/api/predictions_with_accuracy')
 def get_predictions_with_accuracy():
-    """Get predictions with accuracy results"""
+    """Get predictions with accuracy results + pending predictions (today and tomorrow)"""
     try:
-        accuracy_file = 'predictions_with_accuracy.csv'
-
-        if not os.path.exists(accuracy_file):
-            return jsonify({'success': False, 'message': 'Accuracy data not calculated yet'})
-
-        df = pd.read_csv(accuracy_file)
-
-        # Get last 20 predictions with accuracy
-        df_recent = df.tail(20).sort_values('prediction_date', ascending=False)
-
         predictions = []
-        for _, row in df_recent.iterrows():
-            predictions.append({
-                'date': row['prediction_date'],
-                'predicted': row['predicted_direction'],
-                'actual': row['actual_direction'],
-                'confidence': float(row['confidence']),
-                'is_correct': bool(row['is_correct']),
-                'actual_return': float(row['actual_return'])
-            })
+        predictions_df = get_predictions_data()
+
+        if len(predictions_df) == 0:
+            return jsonify({'success': True, 'predictions': []})
+
+        # Helper function to calculate predicted movement
+        def calculate_predicted_movement(direction, confidence):
+            predicted_movement = 0.0
+            accuracy_file = 'predictions_with_accuracy.csv'
+
+            if os.path.exists(accuracy_file):
+                accuracy_df = pd.read_csv(accuracy_file)
+                similar = accuracy_df[accuracy_df['predicted_direction'] == direction]
+                similar = similar[
+                    (similar['confidence'] >= confidence - 0.1) &
+                    (similar['confidence'] <= confidence + 0.1)
+                ]
+
+                if len(similar) > 0:
+                    predicted_movement = similar['actual_return'].mean()
+                else:
+                    all_same_direction = accuracy_df[accuracy_df['predicted_direction'] == direction]
+                    if len(all_same_direction) > 0:
+                        predicted_movement = all_same_direction['actual_return'].mean()
+                    else:
+                        predicted_movement = (confidence - 0.5) * 2.0
+                        if direction == 'DOWN':
+                            predicted_movement = -abs(predicted_movement)
+
+            return float(predicted_movement)
+
+        # Get the latest 2 predictions (one for today, one for tomorrow)
+        latest_predictions = predictions_df.tail(2)
+
+        # Process in reverse order so tomorrow appears first, then today
+        for idx, row in latest_predictions.iloc[::-1].iterrows():
+            data_date = pd.to_datetime(row['data_date'])
+
+            # Calculate target date (next trading day after data_date)
+            next_day = data_date + pd.Timedelta(days=1)
+            if next_day.weekday() == 5:  # Saturday
+                next_day = next_day + pd.Timedelta(days=2)
+            elif next_day.weekday() == 6:  # Sunday
+                next_day = next_day + pd.Timedelta(days=1)
+
+            target_date = next_day.strftime('%Y-%m-%d')
+            direction = row['direction']
+            confidence = float(row['confidence'])
+
+            # Check if this prediction is still pending (no actual result yet)
+            accuracy_file = 'predictions_with_accuracy.csv'
+            is_pending = True
+
+            if os.path.exists(accuracy_file):
+                accuracy_df = pd.read_csv(accuracy_file)
+                # Check if we have actual results for this data_date
+                has_result = len(accuracy_df[accuracy_df['data_date'] == row['data_date']]) > 0
+                is_pending = not has_result
+
+            if is_pending:
+                # This is a pending prediction
+                predicted_movement = calculate_predicted_movement(direction, confidence)
+
+                predictions.append({
+                    'date': target_date,
+                    'prediction_date': row['prediction_date'],
+                    'data_date': row['data_date'],
+                    'predicted': direction,
+                    'actual': 'PENDING',
+                    'confidence': confidence,
+                    'predicted_movement': predicted_movement,
+                    'is_correct': None,
+                    'actual_return': None,
+                    'is_pending': True,
+                    'for_next_day': True
+                })
+
+        # STEP 2: Get past predictions with actual results
+        accuracy_file = 'predictions_with_accuracy.csv'
+        if os.path.exists(accuracy_file):
+            df = pd.read_csv(accuracy_file)
+
+            # Get last 19 predictions with accuracy (so total is 20 including pending)
+            df_recent = df.tail(19).sort_values('prediction_date', ascending=False)
+
+            for _, row in df_recent.iterrows():
+                predictions.append({
+                    'date': row['prediction_date'],
+                    'data_date': row['data_date'],
+                    'predicted': row['predicted_direction'],
+                    'actual': row['actual_direction'],
+                    'confidence': float(row['confidence']),
+                    'is_correct': bool(row['is_correct']),
+                    'actual_return': float(row['actual_return']),
+                    'is_pending': False,
+                    'for_next_day': False
+                })
 
         return jsonify({'success': True, 'predictions': predictions})
 
@@ -1115,10 +1195,9 @@ def get_ai_explanation():
 
         # Get latest prediction direction
         prediction_direction = 'UP'
-        if os.path.exists(PREDICTIONS_FILE):
-            pred_df = pd.read_csv(PREDICTIONS_FILE)
-            if len(pred_df) > 0:
-                prediction_direction = pred_df.iloc[-1]['direction']
+        pred_df = get_predictions_data()
+        if len(pred_df) > 0:
+            prediction_direction = pred_df.iloc[-1]['direction']
 
         return jsonify({
             'success': True,

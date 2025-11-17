@@ -86,32 +86,47 @@
         <!-- Market Status Bar -->
         <div class="row mb-4">
             <div class="col-12">
-                <div class="card shadow-sm border-0 market-status-card">
+                <div class="card shadow-sm border-0 market-status-card" id="market-status-container">
                     <div class="card-body py-3">
-                        <div class="row align-items-center">
-                            <div class="col-lg-2 col-md-3 mb-2 mb-md-0">
-                                <h5 class="mb-0 fw-bold">S&P 500</h5>
-                                <small class="text-muted">As of <span id="market-date">Loading...</span></small>
+                        <!-- Loading State -->
+                        <div id="market-loading" class="text-center py-3">
+                            <i class="fas fa-spinner fa-spin me-2"></i>Loading market data...
+                        </div>
+
+                        <!-- Main Content -->
+                        <div id="market-content" class="row align-items-center" style="display: none;">
+                            <!-- S&P 500 Title -->
+                            <div class="col-xl-2 col-lg-3 col-md-12 mb-3 mb-lg-0 text-center text-lg-start">
+                                <h5 class="mb-0 fw-bold"><i class="fas fa-chart-line me-2 text-primary"></i>S&P 500</h5>
+                                <small class="text-muted">As of <span id="market-date">Today</span></small>
                             </div>
-                            <div class="col-lg-2 col-md-3 text-center mb-2 mb-md-0">
-                                <h3 class="mb-0 fw-bold" id="current-price">$0.00</h3>
-                                <small class="text-muted">Current Price</small>
+
+                            <!-- Current Price -->
+                            <div class="col-xl-2 col-lg-3 col-md-4 col-6 text-center mb-3 mb-lg-0">
+                                <div class="d-flex flex-column align-items-center">
+                                    <h3 class="mb-0 fw-bold text-nowrap" id="current-price">$0.00</h3>
+                                    <small class="text-muted text-nowrap">Current Price</small>
+                                </div>
                             </div>
-                            <div class="col-lg-2 col-md-3 text-center mb-2 mb-md-0">
+
+                            <!-- Daily Change -->
+                            <div class="col-xl-2 col-lg-3 col-md-4 col-6 text-center mb-3 mb-lg-0">
                                 <h4 class="mb-0" id="price-change">
-                                    <span class="badge">+0.00%</span>
+                                    <span class="badge bg-secondary">0.00%</span>
                                 </h4>
-                                <small class="text-muted">Daily Change</small>
+                                <small class="text-muted d-block">Daily Change</small>
                             </div>
-                            <div class="col-lg-3 col-md-6 text-center mb-2 mb-md-0">
-                                <div class="market-hours-box p-2 rounded">
-                                    <div class="d-flex justify-content-center align-items-center gap-2 mb-1">
+
+                            <!-- Market Status -->
+                            <div class="col-xl-3 col-lg-3 col-md-4 col-12 text-center mb-3 mb-lg-0">
+                                <div class="market-hours-box p-3 rounded">
+                                    <div class="d-flex justify-content-center align-items-center gap-2 mb-2">
                                         <span class="market-status-badge" id="market-status-badge">
                                             <i class="fas fa-circle me-1"></i>
                                             <span id="market-status-text">Checking...</span>
                                         </span>
                                     </div>
-                                    <div class="small text-muted">
+                                    <div class="small text-muted mb-1">
                                         <i class="far fa-clock me-1"></i>
                                         <span id="market-hours-text">Market Hours: 9:30 AM - 4:00 PM ET</span>
                                     </div>
@@ -120,14 +135,27 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-lg-3 col-md-6 text-end">
-                                <button class="btn btn-primary btn-lg me-2" id="predict-btn" onclick="runPrediction()">
-                                    <i class="fas fa-magic me-2"></i>Get Prediction
-                                </button>
-                                <button class="btn btn-success btn-lg" onclick="exportPDF()">
-                                    <i class="fas fa-file-pdf me-2"></i>Export PDF
-                                </button>
+
+                            <!-- Action Buttons -->
+                            <div class="col-xl-3 col-lg-12 col-md-12 text-center text-xl-end">
+                                <div class="d-flex flex-wrap justify-content-center justify-content-xl-end gap-2">
+                                    <button class="btn btn-primary btn-lg flex-grow-1 flex-xl-grow-0" id="predict-btn" onclick="runPrediction()">
+                                        <i class="fas fa-magic me-2"></i><span class="d-none d-sm-inline">Get </span>Prediction
+                                    </button>
+                                    <button class="btn btn-success btn-lg flex-grow-1 flex-xl-grow-0" onclick="exportPDF()">
+                                        <i class="fas fa-file-pdf me-2"></i><span class="d-none d-sm-inline">Export </span>PDF
+                                    </button>
+                                </div>
                             </div>
+                        </div>
+
+                        <!-- Error State -->
+                        <div id="market-error" class="text-center py-3 text-danger" style="display: none;">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <span id="market-error-text">Failed to load market data</span>
+                            <button class="btn btn-sm btn-outline-primary ms-2" onclick="loadMarketStatus()">
+                                <i class="fas fa-redo me-1"></i>Retry
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -137,72 +165,97 @@
         <!-- Economic Indicators Panel -->
         <div class="row g-4 mb-4">
             <div class="col-12">
-                <div class="card shadow-sm border-0">
+                <div class="card shadow-sm border-0" id="indicators-container">
                     <div class="card-body">
-                        <h5 class="card-title mb-4 fw-bold">
-                            <i class="fas fa-chart-area me-2 text-info"></i>Key Economic Indicators
-                        </h5>
-                        <div class="row g-3">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h5 class="card-title mb-0 fw-bold">
+                                <i class="fas fa-chart-area me-2 text-info"></i>Key Economic Indicators
+                            </h5>
+                            <small class="text-muted"><i class="fas fa-info-circle me-1"></i>Hover for details</small>
+                        </div>
+
+                        <!-- Loading State -->
+                        <div id="indicators-loading" class="text-center py-4">
+                            <i class="fas fa-spinner fa-spin me-2 text-info"></i>Loading indicators...
+                        </div>
+
+                        <!-- Main Content -->
+                        <div id="indicators-content" class="row g-3" style="display: none;">
                             <!-- Fed Funds Rate -->
-                            <div class="col-lg-2 col-md-4 col-6">
-                                <div class="indicator-box text-center p-3 bg-light rounded">
-                                    <div class="indicator-label small text-muted">Fed Rate</div>
-                                    <div class="indicator-value h5 fw-bold mb-1" id="ind-fed-rate">0.00%</div>
+                            <div class="col-xl-2 col-lg-4 col-md-4 col-6">
+                                <div class="indicator-box text-center p-3 bg-light rounded" data-bs-toggle="tooltip" data-bs-placement="top" title="Federal Reserve interest rate - affects borrowing costs">
+                                    <div class="indicator-icon mb-2"><i class="fas fa-university text-primary"></i></div>
+                                    <div class="indicator-label small text-muted text-nowrap">Fed Rate</div>
+                                    <div class="indicator-value h5 fw-bold mb-1 text-nowrap" id="ind-fed-rate">0.00%</div>
                                     <div class="indicator-change small" id="ind-fed-change">
                                         <i class="fas fa-minus"></i> 0.00
                                     </div>
                                 </div>
                             </div>
                             <!-- Unemployment -->
-                            <div class="col-lg-2 col-md-4 col-6">
-                                <div class="indicator-box text-center p-3 bg-light rounded">
-                                    <div class="indicator-label small text-muted">Unemployment</div>
-                                    <div class="indicator-value h5 fw-bold mb-1" id="ind-unemployment">0.00%</div>
+                            <div class="col-xl-2 col-lg-4 col-md-4 col-6">
+                                <div class="indicator-box text-center p-3 bg-light rounded" data-bs-toggle="tooltip" data-bs-placement="top" title="Percentage of workforce without jobs - key economic health indicator">
+                                    <div class="indicator-icon mb-2"><i class="fas fa-briefcase text-warning"></i></div>
+                                    <div class="indicator-label small text-muted text-nowrap">Unemployment</div>
+                                    <div class="indicator-value h5 fw-bold mb-1 text-nowrap" id="ind-unemployment">0.00%</div>
                                     <div class="indicator-change small" id="ind-unemployment-change">
                                         <i class="fas fa-minus"></i> 0.00
                                     </div>
                                 </div>
                             </div>
                             <!-- CPI -->
-                            <div class="col-lg-2 col-md-4 col-6">
-                                <div class="indicator-box text-center p-3 bg-light rounded">
-                                    <div class="indicator-label small text-muted">CPI (Inflation)</div>
-                                    <div class="indicator-value h5 fw-bold mb-1" id="ind-cpi">0.00</div>
+                            <div class="col-xl-2 col-lg-4 col-md-4 col-6">
+                                <div class="indicator-box text-center p-3 bg-light rounded" data-bs-toggle="tooltip" data-bs-placement="top" title="Consumer Price Index - measures inflation and cost of living">
+                                    <div class="indicator-icon mb-2"><i class="fas fa-shopping-cart text-success"></i></div>
+                                    <div class="indicator-label small text-muted text-nowrap">CPI (Inflation)</div>
+                                    <div class="indicator-value h5 fw-bold mb-1 text-nowrap" id="ind-cpi">0.00</div>
                                     <div class="indicator-change small" id="ind-cpi-change">
                                         <i class="fas fa-minus"></i> 0.00
                                     </div>
                                 </div>
                             </div>
                             <!-- VIX -->
-                            <div class="col-lg-2 col-md-4 col-6">
-                                <div class="indicator-box text-center p-3 bg-light rounded">
-                                    <div class="indicator-label small text-muted">VIX</div>
-                                    <div class="indicator-value h5 fw-bold mb-1" id="ind-vix">0.00</div>
+                            <div class="col-xl-2 col-lg-4 col-md-4 col-6">
+                                <div class="indicator-box text-center p-3 bg-light rounded" data-bs-toggle="tooltip" data-bs-placement="top" title="Volatility Index - market fear gauge (higher = more fear)">
+                                    <div class="indicator-icon mb-2"><i class="fas fa-bolt text-danger"></i></div>
+                                    <div class="indicator-label small text-muted text-nowrap">VIX</div>
+                                    <div class="indicator-value h5 fw-bold mb-1 text-nowrap" id="ind-vix">0.00</div>
                                     <div class="indicator-change small" id="ind-vix-change">
                                         <i class="fas fa-minus"></i> 0.00
                                     </div>
                                 </div>
                             </div>
                             <!-- 10Y Treasury -->
-                            <div class="col-lg-2 col-md-4 col-6">
-                                <div class="indicator-box text-center p-3 bg-light rounded">
-                                    <div class="indicator-label small text-muted">10Y Treasury</div>
-                                    <div class="indicator-value h5 fw-bold mb-1" id="ind-treasury">0.00%</div>
+                            <div class="col-xl-2 col-lg-4 col-md-4 col-6">
+                                <div class="indicator-box text-center p-3 bg-light rounded" data-bs-toggle="tooltip" data-bs-placement="top" title="10-Year Treasury yield - benchmark for long-term interest rates">
+                                    <div class="indicator-icon mb-2"><i class="fas fa-landmark text-info"></i></div>
+                                    <div class="indicator-label small text-muted text-nowrap">10Y Treasury</div>
+                                    <div class="indicator-value h5 fw-bold mb-1 text-nowrap" id="ind-treasury">0.00%</div>
                                     <div class="indicator-change small" id="ind-treasury-change">
                                         <i class="fas fa-minus"></i> 0.00
                                     </div>
                                 </div>
                             </div>
                             <!-- Yield Curve -->
-                            <div class="col-lg-2 col-md-4 col-6">
-                                <div class="indicator-box text-center p-3 bg-light rounded">
-                                    <div class="indicator-label small text-muted">Yield Curve</div>
-                                    <div class="indicator-value h5 fw-bold mb-1" id="ind-yield">0.00</div>
+                            <div class="col-xl-2 col-lg-4 col-md-4 col-6">
+                                <div class="indicator-box text-center p-3 bg-light rounded" data-bs-toggle="tooltip" data-bs-placement="top" title="Difference between 10Y and 2Y Treasury - recession predictor when negative">
+                                    <div class="indicator-icon mb-2"><i class="fas fa-chart-line text-secondary"></i></div>
+                                    <div class="indicator-label small text-muted text-nowrap">Yield Curve</div>
+                                    <div class="indicator-value h5 fw-bold mb-1 text-nowrap" id="ind-yield">0.00</div>
                                     <div class="indicator-change small" id="ind-yield-change">
                                         <i class="fas fa-minus"></i> 0.00
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- Error State -->
+                        <div id="indicators-error" class="text-center py-4 text-danger" style="display: none;">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <span id="indicators-error-text">Failed to load indicators</span>
+                            <button class="btn btn-sm btn-outline-primary ms-2" onclick="loadEconomicIndicators()">
+                                <i class="fas fa-redo me-1"></i>Retry
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -212,19 +265,44 @@
         <!-- Candlestick Chart -->
         <div class="row g-4 mb-4">
             <div class="col-12">
-                <div class="card shadow-sm border-0">
+                <div class="card shadow-sm border-0" id="candlestick-container">
                     <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-4">
-                            <h5 class="card-title mb-0 fw-bold">
-                                <i class="fas fa-chart-candlestick me-2 text-success"></i>Interactive Candlestick Chart (Last 90 Days)
-                            </h5>
-                            <div class="btn-group btn-group-sm" role="group">
-                                <button type="button" class="btn btn-outline-primary active" onclick="updateCandlestickPeriod(90)">90D</button>
-                                <button type="button" class="btn btn-outline-primary" onclick="updateCandlestickPeriod(60)">60D</button>
-                                <button type="button" class="btn btn-outline-primary" onclick="updateCandlestickPeriod(30)">30D</button>
+                        <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+                            <div>
+                                <h5 class="card-title mb-1 fw-bold">
+                                    <i class="fas fa-chart-line me-2 text-success"></i>Interactive Price Chart
+                                </h5>
+                                <small class="text-muted"><i class="fas fa-info-circle me-1"></i>Click and drag to zoom, double-click to reset</small>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <small class="text-muted me-2">Period:</small>
+                                <div class="btn-group btn-group-sm period-selector" role="group" aria-label="Chart period">
+                                    <button type="button" class="btn btn-outline-primary" data-period="30" onclick="updateCandlestickPeriod(30)">30D</button>
+                                    <button type="button" class="btn btn-outline-primary" data-period="60" onclick="updateCandlestickPeriod(60)">60D</button>
+                                    <button type="button" class="btn btn-outline-primary active" data-period="90" onclick="updateCandlestickPeriod(90)">90D</button>
+                                    <button type="button" class="btn btn-outline-primary" data-period="180" onclick="updateCandlestickPeriod(180)">6M</button>
+                                    <button type="button" class="btn btn-outline-primary" data-period="365" onclick="updateCandlestickPeriod(365)">1Y</button>
+                                </div>
                             </div>
                         </div>
-                        <div id="candlestickChart"></div>
+
+                        <!-- Loading State -->
+                        <div id="candlestick-loading" class="text-center py-5" style="display: block;">
+                            <i class="fas fa-spinner fa-spin me-2 text-success" style="font-size: 2rem;"></i>
+                            <div class="mt-3 text-muted">Loading chart data...</div>
+                        </div>
+
+                        <!-- Chart Container -->
+                        <div id="candlestickChart" style="min-height: 450px;"></div>
+
+                        <!-- Error State -->
+                        <div id="candlestick-error" class="text-center py-5 text-danger" style="display: none;">
+                            <i class="fas fa-exclamation-triangle me-2" style="font-size: 2rem;"></i>
+                            <div class="mt-3" id="candlestick-error-text">Failed to load chart</div>
+                            <button class="btn btn-sm btn-outline-primary mt-3" onclick="loadCandlestickChart(currentCandlestickPeriod)">
+                                <i class="fas fa-redo me-1"></i>Retry
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -584,9 +662,24 @@
             <div class="col-12">
                 <div class="card shadow-sm border-0">
                     <div class="card-body">
-                        <h5 class="card-title mb-4 fw-bold">
-                            <i class="fas fa-table me-2 text-secondary"></i>Recent Predictions
-                        </h5>
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h5 class="card-title mb-0 fw-bold">
+                                <i class="fas fa-table me-2 text-secondary"></i>Recent Predictions
+                            </h5>
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                <span class="badge bg-primary bg-opacity-10 text-primary">
+                                    Top row = Next day prediction
+                                </span>
+                            </small>
+                        </div>
+                        <div class="alert alert-info d-flex align-items-center mb-3" role="alert" style="background: linear-gradient(90deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%); border-left: 4px solid #6366f1; border-radius: 12px;">
+                            <i class="fas fa-lightbulb me-2" style="font-size: 1.5rem; color: #6366f1;"></i>
+                            <div style="flex: 1;">
+                                <strong style="color: #6366f1;">Daily Auto-Prediction</strong>
+                                <p class="mb-0 small">The system automatically predicts tomorrow's market movement every day at 5 PM EST. The top row shows today's prediction for the next trading day.</p>
+                            </div>
+                        </div>
                         <div class="table-responsive">
                             <table class="table table-hover" id="predictions-table">
                                 <thead>

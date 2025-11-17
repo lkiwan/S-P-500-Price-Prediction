@@ -277,9 +277,13 @@ async function loadAllData() {
             loadRiskMetrics(),
             loadBestWorstPredictions(),
             loadAIExplanation(),
-            loadCandlestickChart(currentCandlestickPeriod),
             loadEconomicCalendar()
         ]);
+
+        // Load chart separately to not block page load
+        loadCandlestickChart(currentCandlestickPeriod).catch(err => {
+            console.error('Chart loading failed:', err);
+        });
 
         console.log('All data loaded successfully');
     } catch (error) {
@@ -451,7 +455,7 @@ async function loadPredictionHistory() {
     }
 }
 
-// Update prediction history chart - Monthly aggregated
+// Update prediction history chart - Monthly aggregated with enhanced visualization
 function updatePredictionHistoryChart(history) {
     const ctx = document.getElementById('predictionHistoryChart');
 
@@ -469,27 +473,57 @@ function updatePredictionHistoryChart(history) {
     // Convert confidence to percentage
     const confidences = history.avg_confidence.map(c => (c * 100).toFixed(1));
 
-    // Create colors based on UP percentage (more UP = greener)
-    const colors = history.up_percentage.map(pct =>
-        pct >= 50 ? 'rgba(16, 185, 129, 0.8)' : 'rgba(239, 68, 68, 0.8)'
-    );
+    // Calculate DOWN predictions
+    const downCounts = history.total_predictions.map((total, i) => total - history.up_count[i]);
 
     predictionHistoryChart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: monthLabels,
-            datasets: [{
-                label: 'Avg Confidence (%)',
-                data: confidences,
-                backgroundColor: colors,
-                borderColor: colors.map(c => c.replace('0.8', '1')),
-                borderWidth: 2,
-                borderRadius: 8
-            }]
+            datasets: [
+                {
+                    label: 'UP Predictions',
+                    data: history.up_count,
+                    backgroundColor: 'rgba(16, 185, 129, 0.85)',
+                    borderColor: 'rgba(16, 185, 129, 1)',
+                    borderWidth: 2,
+                    borderRadius: 8,
+                    borderSkipped: false,
+                },
+                {
+                    label: 'DOWN Predictions',
+                    data: downCounts,
+                    backgroundColor: 'rgba(239, 68, 68, 0.85)',
+                    borderColor: 'rgba(239, 68, 68, 1)',
+                    borderWidth: 2,
+                    borderRadius: 8,
+                    borderSkipped: false,
+                },
+                {
+                    label: 'Avg Confidence',
+                    data: confidences,
+                    type: 'line',
+                    borderColor: 'rgba(99, 102, 241, 1)',
+                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    borderWidth: 3,
+                    pointBackgroundColor: 'rgba(99, 102, 241, 1)',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    fill: false,
+                    tension: 0.4,
+                    yAxisID: 'y-confidence'
+                }
+            ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: true,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
             plugins: {
                 legend: {
                     display: true,
@@ -497,61 +531,131 @@ function updatePredictionHistoryChart(history) {
                     labels: {
                         font: {
                             size: 12,
-                            family: 'Inter'
-                        }
+                            family: 'Inter',
+                            weight: '500'
+                        },
+                        padding: 15,
+                        usePointStyle: true,
+                        pointStyle: 'circle'
                     }
                 },
                 tooltip: {
+                    enabled: true,
+                    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    borderColor: 'rgba(99, 102, 241, 0.5)',
+                    borderWidth: 1,
+                    padding: 12,
+                    titleFont: {
+                        size: 14,
+                        weight: 'bold',
+                        family: 'Inter'
+                    },
+                    bodyFont: {
+                        size: 13,
+                        family: 'Inter'
+                    },
+                    displayColors: true,
                     callbacks: {
                         title: function(context) {
-                            return context[0].label;
+                            return '📊 ' + context[0].label;
                         },
                         label: function(context) {
                             const index = context.dataIndex;
-                            const conf = confidences[index];
-                            const total = history.total_predictions[index];
-                            const upCount = history.up_count[index];
-                            const upPct = history.up_percentage[index].toFixed(1);
+                            const datasetLabel = context.dataset.label;
+                            const value = context.parsed.y;
 
-                            return [
-                                'Avg Confidence: ' + conf + '%',
-                                'Total Predictions: ' + total,
-                                'UP: ' + upCount + ' (' + upPct + '%)',
-                                'DOWN: ' + (total - upCount) + ' (' + (100 - upPct).toFixed(1) + '%)'
-                            ];
+                            if (datasetLabel === 'Avg Confidence') {
+                                return '🎯 ' + datasetLabel + ': ' + value + '%';
+                            } else if (datasetLabel === 'UP Predictions') {
+                                const pct = history.up_percentage[index].toFixed(1);
+                                return '📈 ' + datasetLabel + ': ' + value + ' (' + pct + '%)';
+                            } else {
+                                const pct = (100 - history.up_percentage[index]).toFixed(1);
+                                return '📉 ' + datasetLabel + ': ' + value + ' (' + pct + '%)';
+                            }
+                        },
+                        footer: function(context) {
+                            const index = context[0].dataIndex;
+                            return '\n📝 Total: ' + history.total_predictions[index] + ' predictions';
                         }
                     }
                 }
             },
             scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 100,
-                    ticks: {
-                        callback: function(value) {
-                            return value + '%';
-                        }
-                    },
-                    grid: {
-                        color: 'rgba(0, 0, 0, 0.05)'
-                    },
-                    title: {
-                        display: true,
-                        text: 'Average Confidence Level',
-                        font: {
-                            size: 11
-                        }
-                    }
-                },
                 x: {
+                    stacked: true,
                     grid: {
                         display: false
                     },
                     ticks: {
-                        maxRotation: 45,
-                        minRotation: 45
+                        font: {
+                            size: 11,
+                            family: 'Inter',
+                            weight: '500'
+                        },
+                        color: '#6b7280'
+                    }
+                },
+                y: {
+                    stacked: true,
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.06)',
+                        drawBorder: false
+                    },
+                    ticks: {
+                        font: {
+                            size: 11,
+                            family: 'Inter'
+                        },
+                        color: '#6b7280'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Number of Predictions',
+                        font: {
+                            size: 12,
+                            family: 'Inter',
+                            weight: '600'
+                        },
+                        color: '#374151'
+                    }
+                },
+                'y-confidence': {
+                    type: 'linear',
+                    position: 'right',
+                    beginAtZero: true,
+                    max: 100,
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
+                        },
+                        font: {
+                            size: 11,
+                            family: 'Inter'
+                        },
+                        color: '#6366f1'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Confidence Level',
+                        font: {
+                            size: 12,
+                            family: 'Inter',
+                            weight: '600'
+                        },
+                        color: '#6366f1'
                     }
                 }
+            },
+            animation: {
+                duration: 1500,
+                easing: 'easeInOutQuart'
             }
         }
     });
@@ -729,44 +833,101 @@ function updatePredictionsTableWithAccuracy(predictions) {
     }
 
     let html = '';
-    predictions.forEach(pred => {
+    let pendingCount = 0;  // Track pending predictions (1st = tomorrow, 2nd = today)
+
+    predictions.forEach((pred, index) => {
         const date = new Date(pred.date).toLocaleString('en-US', { month: 'short', day: 'numeric' });
         const confidence = (pred.confidence * 100).toFixed(1);
 
         const predClass = pred.predicted === 'UP' ? 'up' : 'down';
         const predIcon = pred.predicted === 'UP' ? '<i class="fas fa-arrow-up me-1"></i>' : '<i class="fas fa-arrow-down me-1"></i>';
 
-        const actualClass = pred.actual === 'UP' ? 'up' : 'down';
-        const actualIcon = pred.actual === 'UP' ? '<i class="fas fa-arrow-up me-1"></i>' : '<i class="fas fa-arrow-down me-1"></i>';
+        // Check if this is a PENDING prediction (for next day)
+        if (pred.is_pending) {
+            pendingCount++;
 
-        // Result badge (RIGHT/WRONG)
-        const resultBadge = pred.is_correct ?
-            '<span class="badge bg-success"><i class="fas fa-check me-1"></i>RIGHT</span>' :
-            '<span class="badge bg-danger"><i class="fas fa-times me-1"></i>WRONG</span>';
+            // PENDING PREDICTION - Special styling for next day's prediction
+            const predictedDate = new Date(pred.date);
+            const formattedDate = predictedDate.toLocaleDateString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
 
-        // Actual return
-        const returnValue = pred.actual_return.toFixed(2);
-        const returnClass = pred.actual_return >= 0 ? 'text-success' : 'text-danger';
-        const returnSign = pred.actual_return >= 0 ? '+' : '';
+            // Calculate predicted movement percentage
+            const predictedMovement = pred.predicted_movement || 0;
+            const movementClass = predictedMovement >= 0 ? 'text-success' : 'text-danger';
+            const movementSign = predictedMovement >= 0 ? '+' : '';
+            const movementDisplay = `${movementSign}${predictedMovement.toFixed(2)}%`;
 
-        html += `
-            <tr>
-                <td><small>${date}</small></td>
-                <td>
-                    <span class="direction-badge ${predClass}">
-                        ${predIcon}${pred.predicted}
-                    </span>
-                </td>
-                <td>
-                    <span class="direction-badge ${actualClass}">
-                        ${actualIcon}${pred.actual}
-                    </span>
-                </td>
-                <td>${resultBadge}</td>
-                <td><strong>${confidence}%</strong></td>
-                <td class="${returnClass}"><strong>${returnSign}${returnValue}%</strong></td>
-            </tr>
-        `;
+            // Determine badge text (1st pending = tomorrow, 2nd pending = today)
+            const badgeText = pendingCount === 1 ? 'FOR TOMORROW' : 'FOR TODAY';
+            const badgeIcon = pendingCount === 1 ? 'fa-calendar-plus' : 'fa-calendar-day';
+
+            html += `
+                <tr class="pending-prediction-row">
+                    <td>
+                        <div class="fw-bold text-primary" style="font-size: 0.95rem;">${formattedDate}</div>
+                        <span class="badge bg-primary bg-opacity-10 text-primary" style="font-size: 0.7rem;">
+                            <i class="fas ${badgeIcon} me-1"></i>${badgeText}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="direction-badge ${predClass} pulse-animation">
+                            ${predIcon}${pred.predicted}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge bg-warning text-dark">
+                            <i class="fas fa-hourglass-half me-1"></i>PENDING
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary">
+                            <i class="fas fa-minus me-1"></i>AWAITING
+                        </span>
+                    </td>
+                    <td><strong class="text-primary">${confidence}%</strong></td>
+                    <td class="${movementClass} fw-bold" style="font-size: 1.1rem;">
+                        ${movementDisplay}
+                    </td>
+                </tr>
+            `;
+        } else {
+            // COMPLETED PREDICTION with actual results
+            const actualClass = pred.actual === 'UP' ? 'up' : 'down';
+            const actualIcon = pred.actual === 'UP' ? '<i class="fas fa-arrow-up me-1"></i>' : '<i class="fas fa-arrow-down me-1"></i>';
+
+            // Result badge (RIGHT/WRONG)
+            const resultBadge = pred.is_correct ?
+                '<span class="badge bg-success"><i class="fas fa-check me-1"></i>RIGHT</span>' :
+                '<span class="badge bg-danger"><i class="fas fa-times me-1"></i>WRONG</span>';
+
+            // Actual return
+            const returnValue = pred.actual_return.toFixed(2);
+            const returnClass = pred.actual_return >= 0 ? 'text-success' : 'text-danger';
+            const returnSign = pred.actual_return >= 0 ? '+' : '';
+
+            html += `
+                <tr>
+                    <td><small>${date}</small></td>
+                    <td>
+                        <span class="direction-badge ${predClass}">
+                            ${predIcon}${pred.predicted}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="direction-badge ${actualClass}">
+                            ${actualIcon}${pred.actual}
+                        </span>
+                    </td>
+                    <td>${resultBadge}</td>
+                    <td><strong>${confidence}%</strong></td>
+                    <td class="${returnClass}"><strong>${returnSign}${returnValue}%</strong></td>
+                </tr>
+            `;
+        }
     });
 
     tbody.innerHTML = html;
@@ -774,6 +935,15 @@ function updatePredictionsTableWithAccuracy(predictions) {
 
 // Load market status
 async function loadMarketStatus() {
+    // Show loading state
+    const loadingDiv = document.getElementById('market-loading');
+    const contentDiv = document.getElementById('market-content');
+    const errorDiv = document.getElementById('market-error');
+
+    if (loadingDiv) loadingDiv.style.display = 'block';
+    if (contentDiv) contentDiv.style.display = 'none';
+    if (errorDiv) errorDiv.style.display = 'none';
+
     try {
         const response = await fetch('/api/market_status');
         const data = await response.json();
@@ -781,22 +951,68 @@ async function loadMarketStatus() {
         if (data.success && data.market) {
             const m = data.market;
 
-            document.getElementById('current-price').textContent = '$' + m.current_price.toFixed(2);
-            document.getElementById('market-date').textContent = m.date;
+            // Format price with thousand separators
+            const formattedPrice = new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(m.current_price);
 
+            document.getElementById('current-price').textContent = formattedPrice;
+
+            // Format date - show "Today" if it's today's date
+            const marketDate = new Date(m.date);
+            const today = new Date();
+            const isToday = marketDate.toDateString() === today.toDateString();
+            const dateText = isToday ? 'Today' : marketDate.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
+            document.getElementById('market-date').textContent = dateText;
+
+            // Format change percentage
             const changeElement = document.getElementById('price-change');
-            const changePct = m.change_pct.toFixed(2);
+            const changePct = Math.abs(m.change_pct).toFixed(2);
             const changeClass = m.change >= 0 ? 'bg-success' : 'bg-danger';
             const changeIcon = m.change >= 0 ? '<i class="fas fa-arrow-up me-1"></i>' : '<i class="fas fa-arrow-down me-1"></i>';
+            const changeSign = m.change >= 0 ? '+' : '-';
 
             changeElement.innerHTML = `
                 <span class="badge ${changeClass}">
-                    ${changeIcon}${changePct}%
+                    ${changeIcon}${changeSign}${changePct}%
                 </span>
             `;
+
+            // Add animated effect to price on update
+            const priceElement = document.getElementById('current-price');
+            priceElement.classList.add('price-update-animation');
+            setTimeout(() => {
+                priceElement.classList.remove('price-update-animation');
+            }, 600);
+
+            // Show content, hide loading
+            if (loadingDiv) loadingDiv.style.display = 'none';
+            if (contentDiv) contentDiv.style.display = 'flex';
+            if (errorDiv) errorDiv.style.display = 'none';
+
+        } else {
+            throw new Error(data.error || 'Failed to load market data');
         }
     } catch (error) {
         console.error('Error loading market status:', error);
+
+        // Show error state
+        if (loadingDiv) loadingDiv.style.display = 'none';
+        if (contentDiv) contentDiv.style.display = 'none';
+        if (errorDiv) {
+            errorDiv.style.display = 'block';
+            const errorTextElement = document.getElementById('market-error-text');
+            if (errorTextElement) {
+                errorTextElement.textContent = error.message || 'Failed to load market data. Please try again.';
+            }
+        }
     }
 }
 
@@ -917,6 +1133,10 @@ async function loadFeatureImportance() {
 
 // Load Trading Simulation
 async function loadTradingSimulation() {
+    // Add loading state
+    const metricBoxes = document.querySelectorAll('.metric-box');
+    metricBoxes.forEach(box => box.classList.add('loading'));
+
     try {
         const response = await fetch('/api/trading_simulation');
         const data = await response.json();
@@ -924,24 +1144,29 @@ async function loadTradingSimulation() {
         if (data.success && data.simulation) {
             const sim = data.simulation;
 
-            // Update metrics
-            document.getElementById('sim-initial-capital').textContent = '$' + sim.initial_capital.toLocaleString();
-            document.getElementById('sim-final-capital').textContent = '$' + sim.final_capital.toFixed(0).toLocaleString();
+            // Remove loading state
+            metricBoxes.forEach(box => box.classList.remove('loading'));
+
+            // Update metrics with animations
+            updateMetricWithAnimation('sim-initial-capital', '$' + sim.initial_capital.toLocaleString());
+            updateMetricWithAnimation('sim-final-capital', '$' + sim.final_capital.toFixed(0).toLocaleString());
 
             const returnClass = sim.total_return >= 0 ? 'text-success' : 'text-danger';
             const returnSign = sim.total_return >= 0 ? '+' : '';
-            document.getElementById('sim-total-return').textContent = returnSign + sim.total_return.toFixed(2) + '%';
-            document.getElementById('sim-total-return').className = 'metric-value h5 fw-bold mb-0 ' + returnClass;
+            const returnElement = document.getElementById('sim-total-return');
+            updateMetricWithAnimation('sim-total-return', returnSign + sim.total_return.toFixed(2) + '%');
+            returnElement.className = 'metric-value h5 fw-bold mb-0 ' + returnClass;
 
-            document.getElementById('sim-win-rate').textContent = sim.win_rate.toFixed(1) + '%';
+            updateMetricWithAnimation('sim-win-rate', sim.win_rate.toFixed(1) + '%');
 
             // Performance comparison
-            document.getElementById('sim-model-return').textContent = (sim.total_return >= 0 ? '+' : '') + sim.total_return.toFixed(2) + '%';
-            document.getElementById('sim-buyhold-return').textContent = (sim.buy_hold_return >= 0 ? '+' : '') + sim.buy_hold_return.toFixed(2) + '%';
+            updateMetricWithAnimation('sim-model-return', (sim.total_return >= 0 ? '+' : '') + sim.total_return.toFixed(2) + '%');
+            updateMetricWithAnimation('sim-buyhold-return', (sim.buy_hold_return >= 0 ? '+' : '') + sim.buy_hold_return.toFixed(2) + '%');
 
             const outperformClass = sim.outperformance >= 0 ? 'text-success' : 'text-danger';
-            document.getElementById('sim-outperformance').textContent = (sim.outperformance >= 0 ? '+' : '') + sim.outperformance.toFixed(2) + 'pp';
-            document.getElementById('sim-outperformance').className = 'fw-bold ' + outperformClass;
+            const outperformElement = document.getElementById('sim-outperformance');
+            updateMetricWithAnimation('sim-outperformance', (sim.outperformance >= 0 ? '+' : '') + sim.outperformance.toFixed(2) + 'pp');
+            outperformElement.className = 'fw-bold ' + outperformClass;
 
             // Capital growth chart
             const ctx = document.getElementById('capitalGrowthChart');
@@ -951,6 +1176,7 @@ async function loadTradingSimulation() {
                     capitalGrowthChart.destroy();
                 }
 
+                // Enhanced chart configuration
                 capitalGrowthChart = new Chart(ctx, {
                     type: 'line',
                     data: {
@@ -958,51 +1184,127 @@ async function loadTradingSimulation() {
                         datasets: [{
                             label: 'Capital Growth',
                             data: sim.capital_history,
-                            borderColor: sim.total_return >= 0 ? 'rgba(40, 167, 69, 1)' : 'rgba(220, 53, 69, 1)',
-                            backgroundColor: sim.total_return >= 0 ? 'rgba(40, 167, 69, 0.1)' : 'rgba(220, 53, 69, 0.1)',
-                            borderWidth: 2,
+                            borderColor: sim.total_return >= 0 ? 'rgba(16, 185, 129, 1)' : 'rgba(239, 68, 68, 1)',
+                            backgroundColor: sim.total_return >= 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                            borderWidth: 3,
                             fill: true,
-                            tension: 0.3
+                            tension: 0.4,
+                            pointRadius: 0,
+                            pointHoverRadius: 6,
+                            pointHoverBackgroundColor: sim.total_return >= 0 ? 'rgba(16, 185, 129, 1)' : 'rgba(239, 68, 68, 1)',
+                            pointHoverBorderColor: '#fff',
+                            pointHoverBorderWidth: 2
                         }]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: true,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false
+                        },
                         plugins: {
                             legend: {
                                 display: false
                             },
                             tooltip: {
+                                enabled: true,
+                                backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                                titleColor: '#fff',
+                                bodyColor: '#fff',
+                                borderColor: sim.total_return >= 0 ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.5)',
+                                borderWidth: 2,
+                                padding: 12,
+                                displayColors: false,
                                 callbacks: {
+                                    title: function(context) {
+                                        return '📅 ' + context[0].label;
+                                    },
                                     label: function(context) {
-                                        return 'Capital: $' + context.parsed.y.toFixed(0).toLocaleString();
+                                        const capital = context.parsed.y;
+                                        const initialCapital = sim.initial_capital;
+                                        const gainLoss = capital - initialCapital;
+                                        const gainLossPct = ((gainLoss / initialCapital) * 100).toFixed(2);
+                                        const sign = gainLoss >= 0 ? '+' : '';
+                                        return [
+                                            '💰 Capital: $' + capital.toFixed(0).toLocaleString(),
+                                            '📊 P&L: ' + sign + '$' + gainLoss.toFixed(0).toLocaleString() + ' (' + sign + gainLossPct + '%)'
+                                        ];
                                     }
                                 }
                             }
                         },
                         scales: {
                             x: {
-                                display: false
+                                display: false,
+                                grid: {
+                                    display: false
+                                }
                             },
                             y: {
                                 beginAtZero: false,
-                                title: {
-                                    display: true,
-                                    text: 'Capital ($)'
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.05)',
+                                    drawBorder: false
                                 },
                                 ticks: {
                                     callback: function(value) {
                                         return '$' + value.toFixed(0).toLocaleString();
-                                    }
+                                    },
+                                    font: {
+                                        size: 11,
+                                        family: 'Inter'
+                                    },
+                                    color: '#6b7280'
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Capital ($)',
+                                    font: {
+                                        size: 12,
+                                        family: 'Inter',
+                                        weight: '600'
+                                    },
+                                    color: '#374151'
                                 }
                             }
+                        },
+                        animation: {
+                            duration: 1000,
+                            easing: 'easeInOutQuart'
                         }
                     }
                 });
             }
+
+            console.log('Trading simulation loaded successfully');
+        } else {
+            throw new Error(data.message || 'Failed to load trading simulation data');
         }
     } catch (error) {
         console.error('Error loading trading simulation:', error);
+
+        // Remove loading state
+        metricBoxes.forEach(box => box.classList.remove('loading'));
+
+        // Show error state (optional - could add error UI here)
+        document.getElementById('sim-final-capital').textContent = 'Error';
+        document.getElementById('sim-total-return').textContent = 'N/A';
+        document.getElementById('sim-win-rate').textContent = 'N/A';
+    }
+}
+
+// Helper function to animate metric updates
+function updateMetricWithAnimation(elementId, value) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.style.transition = 'all 0.3s ease';
+        element.style.transform = 'scale(1.1)';
+        element.textContent = value;
+
+        setTimeout(() => {
+            element.style.transform = 'scale(1)';
+        }, 300);
     }
 }
 
@@ -1052,6 +1354,15 @@ async function loadRollingAccuracy() {
 
 // Load Economic Indicators
 async function loadEconomicIndicators() {
+    // Show loading state
+    const loadingDiv = document.getElementById('indicators-loading');
+    const contentDiv = document.getElementById('indicators-content');
+    const errorDiv = document.getElementById('indicators-error');
+
+    if (loadingDiv) loadingDiv.style.display = 'block';
+    if (contentDiv) contentDiv.style.display = 'none';
+    if (errorDiv) errorDiv.style.display = 'none';
+
     try {
         const response = await fetch('/api/economic_indicators');
         const data = await response.json();
@@ -1064,35 +1375,84 @@ async function loadEconomicIndicators() {
                 const icon = change > 0 ? 'fa-arrow-up' : change < 0 ? 'fa-arrow-down' : 'fa-minus';
                 const colorClass = change > 0 ? 'text-success' : change < 0 ? 'text-danger' : 'text-muted';
                 const sign = change > 0 ? '+' : '';
-                return `<i class="fas ${icon} ${colorClass}"></i> ${sign}${Math.abs(change).toFixed(2)}`;
+                const displayChange = Math.abs(change).toFixed(2);
+                return `<i class="fas ${icon} ${colorClass}"></i> <span class="${colorClass}">${sign}${displayChange}</span>`;
+            }
+
+            // Helper function to add pulse animation
+            function addPulseAnimation(elementId) {
+                const element = document.getElementById(elementId);
+                if (element) {
+                    element.classList.add('indicator-update-pulse');
+                    setTimeout(() => {
+                        element.classList.remove('indicator-update-pulse');
+                    }, 600);
+                }
             }
 
             // Fed Funds Rate
-            document.getElementById('ind-fed-rate').textContent = ind.fed_funds_rate.value.toFixed(2) + '%';
+            const fedRate = ind.fed_funds_rate.value.toFixed(2) + '%';
+            document.getElementById('ind-fed-rate').textContent = fedRate;
             document.getElementById('ind-fed-change').innerHTML = formatChange(ind.fed_funds_rate.change, ind.fed_funds_rate.value);
+            addPulseAnimation('ind-fed-rate');
 
             // Unemployment
-            document.getElementById('ind-unemployment').textContent = ind.unemployment_rate.value.toFixed(2) + '%';
+            const unemployment = ind.unemployment_rate.value.toFixed(2) + '%';
+            document.getElementById('ind-unemployment').textContent = unemployment;
             document.getElementById('ind-unemployment-change').innerHTML = formatChange(ind.unemployment_rate.change, ind.unemployment_rate.value);
+            addPulseAnimation('ind-unemployment');
 
             // CPI
-            document.getElementById('ind-cpi').textContent = ind.cpi.value.toFixed(2);
+            const cpi = ind.cpi.value.toFixed(2);
+            document.getElementById('ind-cpi').textContent = cpi;
             document.getElementById('ind-cpi-change').innerHTML = formatChange(ind.cpi.change, ind.cpi.value);
+            addPulseAnimation('ind-cpi');
 
             // VIX
-            document.getElementById('ind-vix').textContent = ind.vix.value.toFixed(2);
+            const vix = ind.vix.value.toFixed(2);
+            document.getElementById('ind-vix').textContent = vix;
             document.getElementById('ind-vix-change').innerHTML = formatChange(ind.vix.change, ind.vix.value);
+            addPulseAnimation('ind-vix');
 
             // 10Y Treasury
-            document.getElementById('ind-treasury').textContent = ind.treasury_10y.value.toFixed(2) + '%';
+            const treasury = ind.treasury_10y.value.toFixed(2) + '%';
+            document.getElementById('ind-treasury').textContent = treasury;
             document.getElementById('ind-treasury-change').innerHTML = formatChange(ind.treasury_10y.change, ind.treasury_10y.value);
+            addPulseAnimation('ind-treasury');
 
             // Yield Curve
-            document.getElementById('ind-yield').textContent = ind.yield_curve.value.toFixed(2);
+            const yieldCurve = ind.yield_curve.value.toFixed(2);
+            document.getElementById('ind-yield').textContent = yieldCurve;
             document.getElementById('ind-yield-change').innerHTML = formatChange(ind.yield_curve.change, ind.yield_curve.value);
+            addPulseAnimation('ind-yield');
+
+            // Initialize Bootstrap tooltips
+            const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+            tooltipTriggerList.forEach(tooltipTriggerEl => {
+                new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+
+            // Show content, hide loading
+            if (loadingDiv) loadingDiv.style.display = 'none';
+            if (contentDiv) contentDiv.style.display = 'flex';
+            if (errorDiv) errorDiv.style.display = 'none';
+
+        } else {
+            throw new Error(data.message || 'Failed to load indicators');
         }
     } catch (error) {
         console.error('Error loading economic indicators:', error);
+
+        // Show error state
+        if (loadingDiv) loadingDiv.style.display = 'none';
+        if (contentDiv) contentDiv.style.display = 'none';
+        if (errorDiv) {
+            errorDiv.style.display = 'block';
+            const errorTextElement = document.getElementById('indicators-error-text');
+            if (errorTextElement) {
+                errorTextElement.textContent = error.message || 'Failed to load economic indicators. Please try again.';
+            }
+        }
     }
 }
 
@@ -1490,19 +1850,38 @@ async function loadAIExplanation() {
 
 // Load Candlestick Chart
 async function loadCandlestickChart(days = 90) {
+    const chartElement = document.querySelector("#candlestickChart");
+    const loadingDiv = document.getElementById('candlestick-loading');
+    const errorDiv = document.getElementById('candlestick-error');
+
+    // Safety check - ensure element exists
+    if (!chartElement) {
+        console.error('Chart element not found');
+        return;
+    }
+
     try {
         const response = await fetch(`/api/candlestick_data?days=${days}`);
         const data = await response.json();
 
-        if (data.success && data.candlestick) {
+        if (data.success && data.candlestick && data.candlestick.length > 0) {
+            // Convert candlestick data to line data (use closing prices)
+            const lineData = data.candlestick.map(candle => ({
+                x: candle.x,
+                y: candle.y[3]  // y[3] is the closing price in candlestick format
+            }));
+
+            // Calculate dynamic height based on screen size
+            const chartHeight = window.innerWidth < 768 ? 350 : window.innerWidth < 992 ? 400 : 450;
+
             const options = {
                 series: [{
-                    name: 'S&P 500',
-                    data: data.candlestick
+                    name: 'S&P 500 Close',
+                    data: lineData
                 }],
                 chart: {
-                    type: 'candlestick',
-                    height: 450,
+                    type: 'line',
+                    height: chartHeight,
                     toolbar: {
                         show: true,
                         tools: {
@@ -1513,26 +1892,64 @@ async function loadCandlestickChart(days = 90) {
                             zoomout: true,
                             pan: true,
                             reset: true
-                        }
+                        },
+                        autoSelected: 'zoom'
                     },
                     animations: {
                         enabled: true,
-                        speed: 800
+                        speed: 800,
+                        animateGradually: {
+                            enabled: true,
+                            delay: 150
+                        }
+                    },
+                    zoom: {
+                        enabled: true,
+                        type: 'x',
+                        autoScaleYaxis: true
+                    }
+                },
+                colors: ['#667eea'],
+                stroke: {
+                    width: 3,
+                    curve: 'smooth'
+                },
+                fill: {
+                    type: 'gradient',
+                    gradient: {
+                        shade: 'light',
+                        type: 'vertical',
+                        shadeIntensity: 0.5,
+                        gradientToColors: ['#764ba2'],
+                        inverseColors: false,
+                        opacityFrom: 0.7,
+                        opacityTo: 0.1,
+                        stops: [0, 100]
+                    }
+                },
+                markers: {
+                    size: 0,
+                    hover: {
+                        size: 7,
+                        sizeOffset: 3
                     }
                 },
                 title: {
-                    text: `S&P 500 Price Movement (${days} Days)`,
+                    text: `S&P 500 Price Movement (Last ${days} Days)`,
                     align: 'left',
                     style: {
                         fontSize: '14px',
-                        fontWeight: '500',
+                        fontWeight: '600',
                         color: '#6c757d'
                     }
                 },
                 xaxis: {
                     type: 'datetime',
                     labels: {
-                        datetimeUTC: false
+                        datetimeUTC: false,
+                        style: {
+                            fontSize: '11px'
+                        }
                     }
                 },
                 yaxis: {
@@ -1541,24 +1958,26 @@ async function loadCandlestickChart(days = 90) {
                     },
                     labels: {
                         formatter: function(value) {
-                            return '$' + value.toFixed(2);
-                        }
-                    }
-                },
-                plotOptions: {
-                    candlestick: {
-                        colors: {
-                            upward: '#10b981',
-                            downward: '#ef4444'
+                            return '$' + value.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                         },
-                        wick: {
-                            useFillColor: true
+                        style: {
+                            fontSize: '11px'
                         }
                     }
                 },
                 grid: {
                     borderColor: '#e0e0e0',
-                    strokeDashArray: 4
+                    strokeDashArray: 4,
+                    xaxis: {
+                        lines: {
+                            show: true
+                        }
+                    },
+                    yaxis: {
+                        lines: {
+                            show: true
+                        }
+                    }
                 },
                 tooltip: {
                     enabled: true,
@@ -1568,27 +1987,58 @@ async function loadCandlestickChart(days = 90) {
                     },
                     y: {
                         formatter: function(value) {
-                            return '$' + value.toFixed(2);
+                            return '$' + value.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                        }
+                    },
+                    marker: {
+                        show: true
+                    }
+                },
+                responsive: [{
+                    breakpoint: 768,
+                    options: {
+                        chart: {
+                            height: 350
+                        },
+                        title: {
+                            style: {
+                                fontSize: '12px'
+                            }
                         }
                     }
-                }
+                }]
             };
 
             // Destroy existing chart
             if (candlestickChart) {
-                candlestickChart.destroy();
+                try {
+                    candlestickChart.destroy();
+                } catch (e) {
+                    console.warn('Error destroying chart:', e);
+                }
             }
 
             // Render new chart
-            candlestickChart = new ApexCharts(document.querySelector("#candlestickChart"), options);
-            candlestickChart.render();
+            candlestickChart = new ApexCharts(chartElement, options);
 
-            console.log(`Candlestick chart loaded: ${days} days`);
+            // Handle render promise
+            candlestickChart.render().then(() => {
+                // Hide loading after successful render
+                if (loadingDiv) loadingDiv.style.display = 'none';
+                console.log(`Line chart loaded: ${days} days`);
+            }).catch(err => {
+                console.error('Chart render error:', err);
+                if (loadingDiv) loadingDiv.style.display = 'none';
+                if (errorDiv) errorDiv.style.display = 'block';
+            });
+
         } else {
-            console.error('Failed to load candlestick data:', data.message);
+            throw new Error('No data available');
         }
     } catch (error) {
-        console.error('Error loading candlestick chart:', error);
+        console.error('Error loading chart:', error);
+        if (loadingDiv) loadingDiv.style.display = 'none';
+        if (errorDiv) errorDiv.style.display = 'block';
     }
 }
 
@@ -1597,10 +2047,11 @@ function updateCandlestickPeriod(days) {
     currentCandlestickPeriod = days;
 
     // Update button states
-    const buttons = document.querySelectorAll('.btn-group button');
+    const buttons = document.querySelectorAll('.period-selector button');
     buttons.forEach(btn => {
         btn.classList.remove('active');
-        if (btn.textContent.includes(days + 'D')) {
+        const btnPeriod = parseInt(btn.getAttribute('data-period'));
+        if (btnPeriod === days) {
             btn.classList.add('active');
         }
     });
