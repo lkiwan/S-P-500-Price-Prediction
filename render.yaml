@@ -27,7 +27,6 @@ services:
   - type: cron
     name: sp500-daily-update
     env: docker
-    plan: free
     dockerfilePath: ./Dockerfile
     schedule: "0 22 * * *"
     dockerCommand: python daily_update_production.py
