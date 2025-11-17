@@ -730,38 +730,51 @@ def get_economic_indicators():
         df = pd.read_csv(FEATURES_FILE)
         latest = df.iloc[-1]
 
-        # Get previous values for trends
-        prev = df.iloc[-2] if len(df) > 1 else latest
+        # Get previous values from 30 days ago for better trend comparison
+        # Economic indicators change monthly, not daily
+        lookback_days = min(30, len(df) - 1)  # Use 30 days or max available
+        prev = df.iloc[-(lookback_days + 1)] if len(df) > lookback_days else latest
+
+        # Helper function to calculate change
+        def safe_change(column_name, latest_val, prev_val):
+            if column_name not in df.columns:
+                return 0
+            try:
+                current = float(latest_val)
+                previous = float(prev_val)
+                return current - previous
+            except (ValueError, TypeError):
+                return 0
 
         indicators = {
             'fed_funds_rate': {
                 'value': float(latest['fed_funds_rate']) if 'fed_funds_rate' in df.columns else 0,
-                'change': float(latest['fed_funds_rate'] - prev['fed_funds_rate']) if 'fed_funds_rate' in df.columns else 0,
+                'change': safe_change('fed_funds_rate', latest['fed_funds_rate'], prev['fed_funds_rate']),
                 'label': 'Fed Funds Rate'
             },
             'unemployment_rate': {
                 'value': float(latest['unemployment_rate']) if 'unemployment_rate' in df.columns else 0,
-                'change': float(latest['unemployment_rate'] - prev['unemployment_rate']) if 'unemployment_rate' in df.columns else 0,
+                'change': safe_change('unemployment_rate', latest['unemployment_rate'], prev['unemployment_rate']),
                 'label': 'Unemployment Rate'
             },
             'cpi': {
                 'value': float(latest['cpi']) if 'cpi' in df.columns else 0,
-                'change': float(latest['cpi'] - prev['cpi']) if 'cpi' in df.columns else 0,
+                'change': safe_change('cpi', latest['cpi'], prev['cpi']),
                 'label': 'CPI (Inflation)'
             },
             'vix': {
                 'value': float(latest['vix']) if 'vix' in df.columns else 0,
-                'change': float(latest['vix'] - prev['vix']) if 'vix' in df.columns else 0,
+                'change': safe_change('vix', latest['vix'], prev['vix']),
                 'label': 'VIX (Fear Index)'
             },
             'treasury_10y': {
                 'value': float(latest['treasury_10y']) if 'treasury_10y' in df.columns else 0,
-                'change': float(latest['treasury_10y'] - prev['treasury_10y']) if 'treasury_10y' in df.columns else 0,
+                'change': safe_change('treasury_10y', latest['treasury_10y'], prev['treasury_10y']),
                 'label': '10Y Treasury'
             },
             'yield_curve': {
                 'value': float(latest['yield_curve']) if 'yield_curve' in df.columns else 0,
-                'change': float(latest['yield_curve'] - prev['yield_curve']) if 'yield_curve' in df.columns else 0,
+                'change': safe_change('yield_curve', latest['yield_curve'], prev['yield_curve']),
                 'label': 'Yield Curve'
             }
         }
@@ -2242,20 +2255,38 @@ def get_market_status():
                 # Get previous close from our data
                 if os.path.exists(PRICE_FILE):
                     price_data = pd.read_csv(PRICE_FILE)
-                    previous_close = price_data['close'].iloc[-1]
+                    last_row = price_data.iloc[-1]
+
+                    # Try uppercase Close first, then lowercase close
+                    if 'Close' in price_data.columns and pd.notna(last_row['Close']):
+                        previous_close = float(last_row['Close'])
+                    elif 'close' in price_data.columns and pd.notna(last_row['close']):
+                        previous_close = float(last_row['close'])
+                    else:
+                        previous_close = current_price
                 else:
                     previous_close = current_price
 
                 change = current_price - previous_close
-                change_pct = (change / previous_close) * 100
+                change_pct = (change / previous_close) * 100 if previous_close != 0 else 0.0
 
-                # Determine market status
-                now = datetime.now()
-                hour = now.hour
-                weekday = now.weekday()
+                # Determine market status (use ET timezone)
+                from datetime import timezone
+                import pytz
 
-                # Market hours: 9:30 AM - 4:00 PM EST, Monday-Friday
-                is_market_hours = (weekday < 5) and (9 <= hour < 16)
+                # Get current time in ET
+                et_tz = pytz.timezone('America/New_York')
+                now_et = datetime.now(et_tz)
+                hour = now_et.hour
+                minute = now_et.minute
+                weekday = now_et.weekday()
+
+                # Market hours: 9:30 AM - 4:00 PM ET, Monday-Friday
+                current_minutes = hour * 60 + minute
+                market_open_minutes = 9 * 60 + 30  # 9:30 AM
+                market_close_minutes = 16 * 60      # 4:00 PM
+
+                is_market_hours = (weekday < 5) and (market_open_minutes <= current_minutes < market_close_minutes)
 
                 return jsonify({
                     'success': True,
@@ -2278,17 +2309,28 @@ def get_market_status():
             df = pd.read_csv(PRICE_FILE)
             df['date'] = pd.to_datetime(df['date'])
 
-            # Get latest price - try both lowercase and uppercase column names
+            # Get latest price - handle both lowercase and uppercase columns
             latest = df.iloc[-1]
             previous = df.iloc[-2]
 
-            # Check if we have uppercase or lowercase columns
-            close_col = 'Close' if 'Close' in df.columns else 'close'
+            # Try to get current price (try uppercase first, then lowercase)
+            if 'Close' in df.columns and pd.notna(latest['Close']):
+                current_price = float(latest['Close'])
+            elif 'close' in df.columns and pd.notna(latest['close']):
+                current_price = float(latest['close'])
+            else:
+                current_price = 0.0
 
-            current_price = float(latest[close_col])
-            prev_price = float(previous[close_col])
+            # Try to get previous price (try uppercase first, then lowercase)
+            if 'Close' in df.columns and pd.notna(previous['Close']):
+                prev_price = float(previous['Close'])
+            elif 'close' in df.columns and pd.notna(previous['close']):
+                prev_price = float(previous['close'])
+            else:
+                prev_price = current_price
+
             change = current_price - prev_price
-            change_pct = (change / prev_price) * 100
+            change_pct = (change / prev_price) * 100 if prev_price != 0 else 0.0
 
             return jsonify({
                 'success': True,
