@@ -1,0 +1,40 @@
+services:
+  # PostgreSQL Database - Free Tier (for persistent storage)
+  - type: pserv
+    name: sp500-database
+    plan: free
+    databaseName: sp500_predictions
+    databaseUser: sp500_user
+
+  # Web Service - Flask Dashboard
+  - type: web
+    name: sp500-prediction-dashboard
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PYTHONUNBUFFERED
+        value: 1
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sp500-database
+          property: connectionString
+
+  # Cron Job - Daily Updates (runs at 5 PM EST / 10 PM UTC)
+  - type: cron
+    name: sp500-daily-update
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    schedule: "0 22 * * *"
+    dockerCommand: python daily_update_production.py
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: 1
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sp500-database
+          property: connectionString

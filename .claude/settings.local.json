@@ -43,7 +43,9 @@
       "Bash(docker-compose logs:*)",
       "Bash(tail:*)",
       "Bash(docker cp:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(docker exec:*)",
+      "Bash(ren:*)"
     ],
     "deny": [],
     "ask": []

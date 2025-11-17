@@ -437,7 +437,7 @@ def get_feature_importance():
 
 @app.route('/api/trading_simulation')
 def get_trading_simulation():
-    """Calculate trading simulation results"""
+    """Calculate trading simulation results with clear win/loss tracking"""
     try:
         accuracy_file = 'predictions_with_accuracy.csv'
 
@@ -457,29 +457,70 @@ def get_trading_simulation():
         trades = []
         capital_history = [initial_capital]
 
+        # Detailed tracking
+        correct_wins = 0  # Predicted UP correctly and made money
+        correct_saves = 0  # Predicted DOWN correctly and avoided loss
+        wrong_losses = 0  # Predicted UP wrongly and lost money
+        wrong_misses = 0  # Predicted DOWN wrongly and missed gains
+
         for _, row in df.iterrows():
-            if row['predicted_direction'] == 'UP':
-                # Buy signal
+            is_correct = row['is_correct']
+            actual_return = row['actual_return']
+            predicted_up = row['predicted_direction'] == 'UP'
+            actual_went_up = row['actual_direction'] == 'UP'
+
+            if predicted_up:
+                # BUY signal - invest 50% of capital
                 investment = capital * position_size
-                returns = row['actual_return'] / 100
+                returns = actual_return / 100
                 profit = investment * returns
                 capital += profit
+
+                trade_result = 'WIN' if profit > 0 else 'LOSS'
+
+                # Track correct vs wrong
+                if is_correct and profit > 0:
+                    correct_wins += 1
+                elif not is_correct and profit < 0:
+                    wrong_losses += 1
 
                 trades.append({
                     'date': row['prediction_date'],
                     'action': 'BUY',
-                    'return': row['actual_return'],
+                    'predicted': 'UP',
+                    'actual': row['actual_direction'],
+                    'is_correct': is_correct,
+                    'return': actual_return,
                     'profit': profit,
-                    'capital': capital
+                    'capital': capital,
+                    'result': trade_result
                 })
             else:
-                # Hold or short (we'll just hold)
+                # HOLD signal - don't trade, but track opportunity
+                # If we were correct to hold (market went down), we saved money
+                # If we were wrong (market went up), we missed gains
+
+                if is_correct and actual_return < 0:
+                    correct_saves += 1
+                    opportunity = 0  # We correctly avoided a loss
+                elif not is_correct and actual_return > 0:
+                    wrong_misses += 1
+                    # Calculate missed opportunity (what we would have made)
+                    opportunity = -(capital * position_size * (actual_return / 100))
+                else:
+                    opportunity = 0
+
                 trades.append({
                     'date': row['prediction_date'],
                     'action': 'HOLD',
-                    'return': 0,
+                    'predicted': 'DOWN',
+                    'actual': row['actual_direction'],
+                    'is_correct': is_correct,
+                    'return': actual_return,
                     'profit': 0,
-                    'capital': capital
+                    'opportunity_cost': opportunity,
+                    'capital': capital,
+                    'result': 'SAVE' if is_correct else 'MISS'
                 })
 
             capital_history.append(capital)
@@ -490,6 +531,11 @@ def get_trading_simulation():
         losing_trades = len([t for t in trades if t.get('profit', 0) < 0])
         total_trades = winning_trades + losing_trades
         win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+
+        # Prediction accuracy breakdown
+        total_predictions = len(df)
+        correct_predictions = df['is_correct'].sum()
+        prediction_accuracy = (correct_predictions / total_predictions * 100) if total_predictions > 0 else 0
 
         # Buy and hold comparison
         if os.path.exists(PRICE_FILE):
@@ -541,7 +587,28 @@ def get_trading_simulation():
             'outperformance': total_return - buy_hold_return,
             'total_trades': total_trades,
             'dates': [t['date'].strftime('%Y-%m-%d') if isinstance(t['date'], pd.Timestamp) else str(t['date']) for t in trades],
-            'capital_history': capital_history
+            'capital_history': capital_history,
+            # Detailed prediction tracking
+            'prediction_accuracy': prediction_accuracy,
+            'correct_predictions': correct_predictions,
+            'total_predictions': total_predictions,
+            'correct_wins': correct_wins,
+            'correct_saves': correct_saves,
+            'wrong_losses': wrong_losses,
+            'wrong_misses': wrong_misses,
+            # Recent trades for display
+            'recent_trades': [
+                {
+                    'date': t['date'].strftime('%Y-%m-%d') if isinstance(t['date'], pd.Timestamp) else str(t['date']),
+                    'action': t['action'],
+                    'predicted': t.get('predicted', ''),
+                    'actual': t.get('actual', ''),
+                    'is_correct': t.get('is_correct', False),
+                    'profit': round(t.get('profit', 0), 2),
+                    'result': t.get('result', '')
+                }
+                for t in trades[-20:]  # Last 20 trades
+            ]
         }
 
         return jsonify({'success': True, 'simulation': results})
