@@ -626,25 +626,25 @@ def get_trading_simulation():
             buy_hold_return = 0
 
         results = {
-            'initial_capital': initial_capital,
-            'final_capital': capital,
-            'total_return': total_return,
-            'winning_trades': winning_trades,
-            'losing_trades': losing_trades,
-            'win_rate': win_rate,
-            'buy_hold_return': buy_hold_return,
-            'outperformance': total_return - buy_hold_return,
-            'total_trades': total_trades,
+            'initial_capital': float(initial_capital),
+            'final_capital': float(capital),
+            'total_return': float(total_return),
+            'winning_trades': int(winning_trades),
+            'losing_trades': int(losing_trades),
+            'win_rate': float(win_rate),
+            'buy_hold_return': float(buy_hold_return),
+            'outperformance': float(total_return - buy_hold_return),
+            'total_trades': int(total_trades),
             'dates': [t['date'].strftime('%Y-%m-%d') if isinstance(t['date'], pd.Timestamp) else str(t['date']) for t in trades],
-            'capital_history': capital_history,
+            'capital_history': [float(x) for x in capital_history],
             # Detailed prediction tracking
-            'prediction_accuracy': prediction_accuracy,
-            'correct_predictions': correct_predictions,
-            'total_predictions': total_predictions,
-            'correct_wins': correct_wins,
-            'correct_saves': correct_saves,
-            'wrong_losses': wrong_losses,
-            'wrong_misses': wrong_misses,
+            'prediction_accuracy': float(prediction_accuracy),
+            'correct_predictions': int(correct_predictions),
+            'total_predictions': int(total_predictions),
+            'correct_wins': int(correct_wins),
+            'correct_saves': int(correct_saves),
+            'wrong_losses': int(wrong_losses),
+            'wrong_misses': int(wrong_misses),
             # Recent trades for display
             'recent_trades': [
                 {
@@ -652,8 +652,8 @@ def get_trading_simulation():
                     'action': t['action'],
                     'predicted': t.get('predicted', ''),
                     'actual': t.get('actual', ''),
-                    'is_correct': t.get('is_correct', False),
-                    'profit': round(t.get('profit', 0), 2),
+                    'is_correct': bool(t.get('is_correct', False)),
+                    'profit': round(float(t.get('profit', 0)), 2),
                     'result': t.get('result', '')
                 }
                 for t in trades[-20:]  # Last 20 trades
