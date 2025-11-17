@@ -35,6 +35,77 @@ except Exception as e:
     sys.exit(1)
 
 # ============================================================================
+# AUTO-MIGRATE CSV DATA ON FIRST RUN (if database is empty)
+# ============================================================================
+if db.use_postgres:
+    existing_predictions = db.get_predictions()
+
+    if len(existing_predictions) == 0:
+        print("\n[AUTO-MIGRATION] Database is empty, checking for CSV files to import...")
+        print("-" * 80)
+
+        # Try to import from CSV files if they exist
+        predictions_imported = 0
+        accuracy_imported = 0
+
+        # Import predictions history
+        if os.path.exists('predictions_history.csv'):
+            try:
+                df = pd.read_csv('predictions_history.csv')
+                print(f"  Found predictions_history.csv with {len(df)} records")
+
+                for _, row in df.iterrows():
+                    prediction_data = {
+                        'prediction_date': row['prediction_date'],
+                        'data_date': str(row['data_date']),
+                        'direction': row['direction'],
+                        'confidence': float(row['confidence']),
+                        'prob_up': float(row['prob_up']),
+                        'prob_down': float(row['prob_down'])
+                    }
+                    if db.save_prediction(prediction_data):
+                        predictions_imported += 1
+
+                print(f"  [OK] Imported {predictions_imported} predictions")
+            except Exception as e:
+                print(f"  [ERROR] Failed to import predictions: {e}")
+
+        # Import accuracy data
+        if os.path.exists('predictions_with_accuracy.csv'):
+            try:
+                df = pd.read_csv('predictions_with_accuracy.csv')
+                print(f"  Found predictions_with_accuracy.csv with {len(df)} records")
+
+                for _, row in df.iterrows():
+                    accuracy_data = {
+                        'prediction_date': row['prediction_date'],
+                        'data_date': str(row['data_date']),
+                        'predicted_direction': row['predicted_direction'],
+                        'confidence': float(row['confidence']),
+                        'actual_direction': row['actual_direction'],
+                        'actual_return': float(row['actual_return']),
+                        'is_correct': bool(row['is_correct']),
+                        'current_price': float(row['current_price']),
+                        'next_price': float(row['next_price']),
+                        'next_date': str(row['next_date'])
+                    }
+                    if db.save_accuracy(accuracy_data):
+                        accuracy_imported += 1
+
+                print(f"  [OK] Imported {accuracy_imported} accuracy records")
+            except Exception as e:
+                print(f"  [ERROR] Failed to import accuracy data: {e}")
+
+        if predictions_imported > 0 or accuracy_imported > 0:
+            print(f"\n[AUTO-MIGRATION COMPLETE]")
+            print(f"  Total predictions: {predictions_imported}")
+            print(f"  Total accuracy records: {accuracy_imported}")
+            print("-" * 80)
+        else:
+            print("  [INFO] No CSV files found to import")
+            print("-" * 80)
+
+# ============================================================================
 # STEP 1: Fetch Latest Prices
 # ============================================================================
 print("\n[STEP 1/4] Fetching latest S&P 500 data...")

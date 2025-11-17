@@ -45,7 +45,8 @@
       "Bash(docker cp:*)",
       "Bash(git checkout:*)",
       "Bash(docker exec:*)",
-      "Bash(ren:*)"
+      "Bash(ren:*)",
+      "WebFetch(domain:s-p-500-price-prediction.onrender.com)"
     ],
     "deny": [],
     "ask": []
