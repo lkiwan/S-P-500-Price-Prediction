@@ -19,6 +19,9 @@ import time
 # Add src to path
 sys.path.append('src')
 
+# Import database utility
+from utils.database import PredictionDatabase
+
 app = Flask(__name__)
 
 # Configuration
@@ -27,6 +30,33 @@ MODELS_DIR = 'models'
 PREDICTIONS_FILE = 'predictions_history.csv'
 FEATURES_FILE = 'data/features/features_complete.csv'
 PRICE_FILE = 'data/raw/price_data.csv'
+
+# Initialize database (uses PostgreSQL on Render, CSV locally)
+try:
+    db = PredictionDatabase()
+    print(f"[DATABASE] Initialized: {'PostgreSQL' if db.use_postgres else 'CSV (Local)'}")
+except Exception as e:
+    print(f"[DATABASE] Warning: Could not initialize database: {e}")
+    db = None
+
+
+# Helper functions for database/CSV access
+def get_predictions_data():
+    """Get predictions from database or CSV fallback"""
+    if db:
+        return db.get_predictions()
+    elif os.path.exists(PREDICTIONS_FILE):
+        return pd.read_csv(PREDICTIONS_FILE)
+    return pd.DataFrame()
+
+
+def get_accuracy_data_helper():
+    """Get accuracy data from database or CSV fallback"""
+    if db:
+        return db.get_accuracy_data()
+    elif os.path.exists('predictions_with_accuracy.csv'):
+        return pd.read_csv('predictions_with_accuracy.csv')
+    return pd.DataFrame()
 
 
 @app.route('/')
@@ -65,10 +95,16 @@ def get_latest_prediction():
 def get_prediction_history():
     """Get prediction history for charts - Monthly aggregated for last 12 months"""
     try:
-        if not os.path.exists(PREDICTIONS_FILE):
-            return jsonify({'success': False, 'message': 'No history yet'})
+        # Get predictions from database (or CSV fallback)
+        if db:
+            df = db.get_predictions()
+        else:
+            if not os.path.exists(PREDICTIONS_FILE):
+                return jsonify({'success': False, 'message': 'No history yet'})
+            df = pd.read_csv(PREDICTIONS_FILE)
 
-        df = pd.read_csv(PREDICTIONS_FILE)
+        if len(df) == 0:
+            return jsonify({'success': False, 'message': 'No history yet'})
 
         # Convert to datetime
         df['prediction_date'] = pd.to_datetime(df['prediction_date'], format='mixed')
@@ -282,7 +318,7 @@ def run_prediction():
 
 
 def save_prediction_to_history(result, data_date):
-    """Save prediction to history file"""
+    """Save prediction to history (database or CSV)"""
     try:
         new_record = {
             'prediction_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -293,13 +329,16 @@ def save_prediction_to_history(result, data_date):
             'prob_down': result['probability_down']
         }
 
-        if os.path.exists(PREDICTIONS_FILE):
-            df = pd.read_csv(PREDICTIONS_FILE)
-            df = pd.concat([df, pd.DataFrame([new_record])], ignore_index=True)
+        # Save to database if available, otherwise CSV
+        if db:
+            db.save_prediction(new_record)
         else:
-            df = pd.DataFrame([new_record])
-
-        df.to_csv(PREDICTIONS_FILE, index=False)
+            if os.path.exists(PREDICTIONS_FILE):
+                df = pd.read_csv(PREDICTIONS_FILE)
+                df = pd.concat([df, pd.DataFrame([new_record])], ignore_index=True)
+            else:
+                df = pd.DataFrame([new_record])
+            df.to_csv(PREDICTIONS_FILE, index=False)
 
     except Exception as e:
         print(f"Error saving prediction: {e}")
@@ -315,12 +354,17 @@ def project_report():
 def get_accuracy_stats():
     """Get prediction accuracy statistics"""
     try:
-        accuracy_file = 'predictions_with_accuracy.csv'
+        # Get accuracy data from database (or CSV fallback)
+        if db:
+            df = db.get_accuracy_data()
+        else:
+            accuracy_file = 'predictions_with_accuracy.csv'
+            if not os.path.exists(accuracy_file):
+                return jsonify({'success': False, 'message': 'Accuracy data not calculated yet'})
+            df = pd.read_csv(accuracy_file)
 
-        if not os.path.exists(accuracy_file):
+        if len(df) == 0:
             return jsonify({'success': False, 'message': 'Accuracy data not calculated yet'})
-
-        df = pd.read_csv(accuracy_file)
 
         # Overall stats
         total = len(df)
@@ -439,12 +483,17 @@ def get_feature_importance():
 def get_trading_simulation():
     """Calculate trading simulation results with clear win/loss tracking"""
     try:
-        accuracy_file = 'predictions_with_accuracy.csv'
+        # Get accuracy data from database (or CSV fallback)
+        if db:
+            df = db.get_accuracy_data()
+        else:
+            accuracy_file = 'predictions_with_accuracy.csv'
+            if not os.path.exists(accuracy_file):
+                return jsonify({'success': False, 'message': 'Accuracy data not available'})
+            df = pd.read_csv(accuracy_file)
 
-        if not os.path.exists(accuracy_file):
+        if len(df) == 0:
             return jsonify({'success': False, 'message': 'Accuracy data not available'})
-
-        df = pd.read_csv(accuracy_file)
         df['prediction_date'] = pd.to_datetime(df['prediction_date'], format='mixed')
         df['data_date'] = pd.to_datetime(df['data_date'])
         df = df.sort_values('prediction_date')
@@ -1576,8 +1625,8 @@ def export_pdf():
         # ================== PERFORMANCE METRICS ==================
         elements.append(Paragraph("2. PERFORMANCE METRICS", heading_style))
 
-        if os.path.exists('predictions_with_accuracy.csv'):
-            df = pd.read_csv('predictions_with_accuracy.csv')
+        df = get_accuracy_data_helper()
+        if len(df) > 0:
             total = len(df)
             correct = df['is_correct'].sum()
             accuracy = (correct / total) * 100 if total > 0 else 0
@@ -1714,8 +1763,8 @@ def export_pdf():
             from src.models.backtester import Backtester
             backtester = Backtester()
 
-            if os.path.exists('predictions_with_accuracy.csv') and os.path.exists('data/processed/sp500_prices.csv'):
-                predictions_df = pd.read_csv('predictions_with_accuracy.csv')
+            predictions_df = get_accuracy_data_helper()
+            if len(predictions_df) > 0 and os.path.exists('data/processed/sp500_prices.csv'):
                 price_df = pd.read_csv('data/processed/sp500_prices.csv')
 
                 strategies = {
@@ -1850,8 +1899,8 @@ def export_pdf():
         # ================== RISK ANALYSIS ==================
         elements.append(Paragraph("5. RISK METRICS", heading_style))
 
-        if os.path.exists('predictions_with_accuracy.csv'):
-            df = pd.read_csv('predictions_with_accuracy.csv')
+        df = get_accuracy_data_helper()
+        if len(df) > 0:
 
             # Calculate risk metrics
             returns = df['actual_return'].dropna()
@@ -1975,8 +2024,8 @@ def export_pdf():
         # ================== RECENT PREDICTIONS ==================
         elements.append(Paragraph("7. RECENT PREDICTIONS (Last 15)", heading_style))
 
-        if os.path.exists('predictions_with_accuracy.csv'):
-            df = pd.read_csv('predictions_with_accuracy.csv')
+        df = get_accuracy_data_helper()
+        if len(df) > 0:
             recent_df = df.tail(15).sort_values('prediction_date', ascending=False)
 
             recent_data = [['Date', 'Predicted', 'Actual', 'Result', 'Conf.', 'Return']]
