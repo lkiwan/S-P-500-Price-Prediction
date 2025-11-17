@@ -1,11 +1,11 @@
-services:
+databases:
   # PostgreSQL Database - Free Tier (for persistent storage)
-  - type: pserv
-    name: sp500-database
-    plan: free
+  - name: sp500-database
     databaseName: sp500_predictions
-    databaseUser: sp500_user
+    user: sp500_user
+    plan: free
 
+services:
   # Web Service - Flask Dashboard
   - type: web
     name: sp500-prediction-dashboard
