@@ -2310,6 +2310,105 @@ def get_market_status():
         return jsonify({'success': False, 'error': str(e)})
 
 
+@app.route('/api/database_status')
+def database_status():
+    """Check database connection and data status"""
+    try:
+        if not db:
+            return jsonify({
+                'success': False,
+                'error': 'Database not initialized',
+                'using_postgres': False
+            })
+
+        # Get counts
+        predictions_df = db.get_predictions()
+        accuracy_df = db.get_accuracy_data()
+
+        status = {
+            'success': True,
+            'using_postgres': db.use_postgres,
+            'database_type': 'PostgreSQL' if db.use_postgres else 'CSV Files',
+            'predictions_count': len(predictions_df),
+            'accuracy_count': len(accuracy_df),
+            'csv_files_exist': {
+                'predictions_history': os.path.exists('predictions_history.csv'),
+                'predictions_with_accuracy': os.path.exists('predictions_with_accuracy.csv')
+            }
+        }
+
+        if len(accuracy_df) > 0:
+            correct = accuracy_df['is_correct'].sum()
+            total = len(accuracy_df)
+            status['overall_accuracy'] = round((correct / total) * 100, 2)
+            status['correct_predictions'] = int(correct)
+
+        return jsonify(status)
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/migrate_csv_to_db', methods=['POST'])
+def migrate_csv_to_db():
+    """Manually trigger CSV to database migration"""
+    try:
+        if not db or not db.use_postgres:
+            return jsonify({
+                'success': False,
+                'error': 'PostgreSQL database not available'
+            })
+
+        predictions_imported = 0
+        accuracy_imported = 0
+
+        # Import predictions history
+        if os.path.exists('predictions_history.csv'):
+            df = pd.read_csv('predictions_history.csv')
+
+            for _, row in df.iterrows():
+                prediction_data = {
+                    'prediction_date': row['prediction_date'],
+                    'data_date': str(row['data_date']),
+                    'direction': row['direction'],
+                    'confidence': float(row['confidence']),
+                    'prob_up': float(row['prob_up']),
+                    'prob_down': float(row['prob_down'])
+                }
+                if db.save_prediction(prediction_data):
+                    predictions_imported += 1
+
+        # Import accuracy data
+        if os.path.exists('predictions_with_accuracy.csv'):
+            df = pd.read_csv('predictions_with_accuracy.csv')
+
+            for _, row in df.iterrows():
+                accuracy_data = {
+                    'prediction_date': row['prediction_date'],
+                    'data_date': str(row['data_date']),
+                    'predicted_direction': row['predicted_direction'],
+                    'confidence': float(row['confidence']),
+                    'actual_direction': row['actual_direction'],
+                    'actual_return': float(row['actual_return']),
+                    'is_correct': bool(row['is_correct']),
+                    'current_price': float(row['current_price']),
+                    'next_price': float(row['next_price']),
+                    'next_date': str(row['next_date'])
+                }
+                if db.save_accuracy(accuracy_data):
+                    accuracy_imported += 1
+
+        return jsonify({
+            'success': True,
+            'predictions_imported': predictions_imported,
+            'accuracy_imported': accuracy_imported,
+            'message': f'Imported {predictions_imported} predictions and {accuracy_imported} accuracy records'
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
 if __name__ == '__main__':
     print("\n" + "="*70)
     print("S&P 500 PREDICTION DASHBOARD")
