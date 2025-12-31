@@ -294,7 +294,7 @@ def post_ai_technical_analysis():
         ai_content = generate_technical_analysis(current_price, rsi, macd, trend, atr)
         if ai_content:
             clean_content = clean_ai_content(ai_content, 350)
-            caption += f"\n\n🤖 <b>AI Insight:</b>\n{clean_content}"
+            caption += f"\n\n💡 <b>Insight:</b>\n{clean_content}"
 
     caption += "\n\n#TechnicalAnalysis #SP500 #Trading"
 
@@ -384,7 +384,7 @@ def post_ai_quote_analysis():
         ai_content = generate_quote_analysis(quote, author)
         if ai_content:
             clean_content = clean_ai_content(ai_content, 350)
-            caption += f"\n\n🤖 <b>AI Analysis:</b>\n{clean_content}"
+            caption += f"\n\n📖 <b>Analysis:</b>\n{clean_content}"
 
     caption += f"\n\n#TradingWisdom #Quotes #{author.replace(' ', '')}"
 
@@ -585,7 +585,7 @@ def post_ai_market_stats():
         ai_response = call_groq_api(prompt, max_tokens=60, temperature=0.7)
         if ai_response:
             clean_response = clean_ai_content(ai_response, 150)
-            ai_comment = f"\n\n🤖 {clean_response}"
+            ai_comment = f"\n\n💬 {clean_response}"
 
     caption = f"""📊📊📊 <b>MARKET STATISTICS</b> 📊📊📊
 
