@@ -83,3 +83,8 @@ htmlcov/
 .dmypy.json
 dmypy.json
 .groq_key
+.unsplash_key
+.finnhub_key
+
+# Generated images
+images/

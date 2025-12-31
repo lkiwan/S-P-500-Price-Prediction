@@ -33,10 +33,34 @@ try:
         generate_signal_analysis,
         GROQ_API_KEY
     )
-    GROQ_AVAILABLE = GROQ_API_KEY != "YOUR_GROQ_API_KEY_HERE"
+    GROQ_AVAILABLE = GROQ_API_KEY != "YOUR_GROQ_API_KEY_HERE" and GROQ_API_KEY != ""
 except ImportError:
     GROQ_AVAILABLE = False
     print("[WARNING] groq_ai.py not found. AI features disabled.")
+
+# Import News Fetcher module
+try:
+    from news_fetcher import get_news_for_telegram, fetch_market_news
+    NEWS_AVAILABLE = True
+except ImportError:
+    NEWS_AVAILABLE = False
+    print("[WARNING] news_fetcher.py not found. News features disabled.")
+
+# Import Image Generator module
+try:
+    from image_generator import (
+        create_technical_chart,
+        create_quote_card,
+        create_news_banner,
+        create_stats_graphic,
+        create_tip_card,
+        UNSPLASH_AVAILABLE
+    )
+    IMAGES_AVAILABLE = True
+except ImportError:
+    IMAGES_AVAILABLE = False
+    UNSPLASH_AVAILABLE = False
+    print("[WARNING] image_generator.py not found. Image features disabled.")
 
 # Configuration
 TELEGRAM_BOT_TOKEN = "7125291296:AAFG1rkGILb22CVnYSr3UEmUxXg_8ikcHMQ"
@@ -80,6 +104,44 @@ def send_telegram_message(text, parse_mode="HTML"):
         return False
 
 
+def send_telegram_photo(photo_bytes, caption=None, parse_mode="HTML"):
+    """Send a photo to Telegram"""
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto"
+
+    try:
+        # Prepare the photo
+        if hasattr(photo_bytes, 'read'):
+            photo_bytes.seek(0)
+            photo_data = photo_bytes.read()
+            photo_bytes.seek(0)
+        else:
+            photo_data = photo_bytes
+
+        files = {
+            'photo': ('image.png', photo_data, 'image/png')
+        }
+
+        data = {
+            'chat_id': TELEGRAM_CHAT_ID,
+        }
+
+        if caption:
+            data['caption'] = caption
+            data['parse_mode'] = parse_mode
+
+        response = requests.post(url, data=data, files=files, timeout=60, verify=False)
+
+        if response.status_code == 200:
+            print(f"[OK] Photo sent successfully")
+            return True
+        else:
+            print(f"[ERROR] Photo failed: {response.text}")
+            return False
+    except Exception as e:
+        print(f"[ERROR] Photo error: {e}")
+        return False
+
+
 def get_price_data(days=60):
     """Load price data"""
     try:
@@ -113,6 +175,22 @@ def get_current_time_morocco():
     return datetime.now(MOROCCO_TIMEZONE)
 
 
+def clean_ai_content(text, max_length=400):
+    """Clean AI-generated content for Telegram captions"""
+    if not text:
+        return ""
+    # Remove HTML tags that might be unclosed
+    clean = text.replace('<b>', '').replace('</b>', '')
+    clean = clean.replace('<i>', '').replace('</i>', '')
+    clean = clean.replace('<code>', '').replace('</code>', '')
+    clean = clean.replace('<pre>', '').replace('</pre>', '')
+    clean = clean.replace('<a>', '').replace('</a>', '')
+    # Limit length
+    if len(clean) > max_length:
+        clean = clean[:max_length] + "..."
+    return clean
+
+
 # ============================================================================
 # FAMOUS QUOTES DATABASE (for fallback and AI analysis)
 # ============================================================================
@@ -144,11 +222,11 @@ MARKET_EVENTS = [
 # ============================================================================
 
 def post_ai_technical_analysis():
-    """Post AI-generated technical analysis"""
+    """Post AI-generated technical analysis with chart image"""
     print("Generating AI Technical Analysis...")
 
     df = get_features_data()
-    price_df = get_price_data(30)
+    price_df = get_price_data(60)
 
     if df.empty or price_df.empty:
         return post_ai_market_insight()
@@ -165,10 +243,13 @@ def post_ai_technical_analysis():
     # Determine trend
     if current_price > sma_20 > sma_50:
         trend = "UPTREND"
+        trend_emoji = "🚀"
     elif current_price < sma_20 < sma_50:
         trend = "DOWNTREND"
+        trend_emoji = "📉"
     else:
         trend = "SIDEWAYS"
+        trend_emoji = "↔️"
 
     # Calculate ATR
     if len(price_df) >= 14:
@@ -180,15 +261,48 @@ def post_ai_technical_analysis():
     else:
         atr = current_price * 0.01
 
+    # Generate chart image
+    chart_image = None
+    if IMAGES_AVAILABLE:
+        try:
+            print("Creating technical chart...")
+            chart_image = create_technical_chart(price_df)
+        except Exception as e:
+            print(f"Chart error: {e}")
+
+    # Generate caption
+    rsi_signal = "🔴 Overbought" if rsi > 70 else "🟢 Oversold" if rsi < 30 else "⚪ Neutral"
+    macd_signal = "🟢 Bullish" if macd > 0 else "🔴 Bearish"
+
+    caption = f"""📊📊📊 <b>TECHNICAL ANALYSIS</b> 📊📊📊
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+💰 <b>S&P 500:</b> <code>${current_price:,.2f}</code>
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+{trend_emoji} <b>Trend:</b> {trend}
+📊 <b>RSI (14):</b> {rsi:.1f} {rsi_signal}
+📈 <b>MACD:</b> {macd:.2f} {macd_signal}
+💨 <b>ATR:</b> {atr:.2f}
+
+━━━━━━━━━━━━━━━━━━━━━━"""
+
+    # Add AI insight if available
     if GROQ_AVAILABLE:
-        # Use AI to generate analysis
         ai_content = generate_technical_analysis(current_price, rsi, macd, trend, atr)
-
         if ai_content:
-            return send_telegram_message(ai_content)
+            clean_content = clean_ai_content(ai_content, 350)
+            caption += f"\n\n🤖 <b>AI Insight:</b>\n{clean_content}"
 
-    # Fallback to template-based message
-    return post_fallback_technical(current_price, rsi, macd, trend, atr)
+    caption += "\n\n#TechnicalAnalysis #SP500 #Trading"
+
+    # Send with or without image
+    if chart_image:
+        return send_telegram_photo(chart_image, caption)
+    else:
+        return send_telegram_message(caption)
 
 
 def post_fallback_technical(price, rsi, macd, trend, atr):
@@ -240,29 +354,45 @@ Focus on making good decisions consistently, and the profits will follow.
 
 
 def post_ai_quote_analysis():
-    """Post AI analysis of a famous quote"""
+    """Post AI analysis of a famous quote with quote card image"""
     print("Generating AI Quote Analysis...")
 
     quote, author = random.choice(FAMOUS_QUOTES)
 
-    if GROQ_AVAILABLE:
-        ai_content = generate_quote_analysis(quote, author)
-        if ai_content:
-            return send_telegram_message(ai_content)
+    # Generate quote card image
+    quote_image = None
+    if IMAGES_AVAILABLE:
+        try:
+            print("Creating quote card...")
+            quote_image = create_quote_card(quote, author)
+        except Exception as e:
+            print(f"Quote card error: {e}")
 
-    # Fallback
-    msg = f"""
-💬 <b>WISDOM FROM THE MASTERS</b>
+    # Generate caption
+    caption = f"""💬💬💬 <b>WISDOM FROM THE MASTERS</b> 💬💬💬
+
+━━━━━━━━━━━━━━━━━━━━━━
 
 <i>"{quote}"</i>
 
 — <b>{author}</b>
 
-This timeless wisdom reminds us that successful trading is about patience, discipline, and emotional control.
+━━━━━━━━━━━━━━━━━━━━━━"""
 
-#TradingWisdom #Quotes #{author.replace(' ', '')}
-"""
-    return send_telegram_message(msg)
+    # Add AI analysis if available
+    if GROQ_AVAILABLE:
+        ai_content = generate_quote_analysis(quote, author)
+        if ai_content:
+            clean_content = clean_ai_content(ai_content, 350)
+            caption += f"\n\n🤖 <b>AI Analysis:</b>\n{clean_content}"
+
+    caption += f"\n\n#TradingWisdom #Quotes #{author.replace(' ', '')}"
+
+    # Send with or without image
+    if quote_image:
+        return send_telegram_photo(quote_image, caption)
+    else:
+        return send_telegram_message(caption)
 
 
 def post_ai_market_history():
@@ -292,34 +422,62 @@ def post_ai_market_history():
 
 
 def post_ai_trading_tip():
-    """Post AI-generated trading tip"""
+    """Post AI-generated trading tip with tip card image"""
     print("Generating AI Trading Tip...")
 
-    if GROQ_AVAILABLE:
-        ai_content = generate_trading_tip()
-        if ai_content:
-            return send_telegram_message(ai_content)
-
-    # Fallback
+    # Fallback tips
     tips = [
         "Never risk more than 2% of your portfolio on a single trade.",
         "The best trade is often no trade at all.",
         "Cut your losses short and let your winners run.",
         "Trade the plan, not your emotions.",
-        "The trend is your friend - don't fight it."
+        "The trend is your friend - don't fight it.",
+        "Position sizing is more important than entry timing.",
+        "Always know your exit before you enter.",
+        "The market can stay irrational longer than you can stay solvent.",
     ]
-    tip = random.choice(tips)
 
-    msg = f"""
-💡 <b>TRADING TIP</b>
+    tip_number = random.randint(1, 100)
 
-{tip}
+    # Get AI tip or use fallback
+    if GROQ_AVAILABLE:
+        ai_tip = generate_trading_tip()
+        if ai_tip:
+            # Clean the tip text for the image
+            tip_text = ai_tip.replace('<b>', '').replace('</b>', '').replace('<i>', '').replace('</i>', '')
+            tip_text = tip_text.split('\n')[0][:200]  # First line, max 200 chars
+        else:
+            tip_text = random.choice(tips)
+    else:
+        tip_text = random.choice(tips)
 
-Remember: Consistent small gains beat occasional big wins. Focus on risk management first, profits second.
+    # Generate tip card image
+    tip_image = None
+    if IMAGES_AVAILABLE:
+        try:
+            print("Creating tip card...")
+            tip_image = create_tip_card(tip_text, tip_number)
+        except Exception as e:
+            print(f"Tip card error: {e}")
 
-#TradingTips #RiskManagement #Education
-"""
-    return send_telegram_message(msg)
+    # Generate caption
+    caption = f"""💡💡💡 <b>TRADING TIP #{tip_number}</b> 💡💡💡
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+{tip_text}
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+📌 <i>Consistent small gains beat occasional big wins. Focus on risk management first!</i>
+
+#TradingTips #RiskManagement #Education"""
+
+    # Send with or without image
+    if tip_image:
+        return send_telegram_photo(tip_image, caption)
+    else:
+        return send_telegram_message(caption)
 
 
 def post_ai_did_you_know():
@@ -383,7 +541,7 @@ Always compare P/E within the same industry!
 
 
 def post_ai_market_stats():
-    """Post market statistics with AI commentary"""
+    """Post market statistics with AI commentary and stats graphic"""
     print("Generating Market Stats...")
 
     df = get_price_data(252)
@@ -394,39 +552,167 @@ def post_ai_market_stats():
     day_change = ((df['Close'].iloc[-1] / df['Close'].iloc[-2]) - 1) * 100
     week_change = ((df['Close'].iloc[-1] / df['Close'].iloc[-5]) - 1) * 100 if len(df) > 5 else 0
     month_change = ((df['Close'].iloc[-1] / df['Close'].iloc[-22]) - 1) * 100 if len(df) > 22 else 0
+    ytd_change = ((df['Close'].iloc[-1] / df['Close'].iloc[0]) - 1) * 100 if len(df) > 22 else 0
 
     high_52w = float(df['High'].max())
     low_52w = float(df['Low'].min())
     from_high = ((current_price - high_52w) / high_52w) * 100
 
     day_emoji = "🟢" if day_change > 0 else "🔴" if day_change < 0 else "⚪"
+    week_emoji = "🟢" if week_change > 0 else "🔴" if week_change < 0 else "⚪"
+    month_emoji = "🟢" if month_change > 0 else "🔴" if month_change < 0 else "⚪"
+
+    # Generate stats graphic
+    stats_image = None
+    if IMAGES_AVAILABLE:
+        try:
+            print("Creating stats graphic...")
+            stats_data = {
+                'price': current_price,
+                'day_change': day_change,
+                'week_change': week_change,
+                'month_change': month_change,
+                'ytd_change': ytd_change
+            }
+            stats_image = create_stats_graphic(stats_data)
+        except Exception as e:
+            print(f"Stats graphic error: {e}")
 
     # AI commentary
     ai_comment = ""
     if GROQ_AVAILABLE:
         prompt = f"In one sentence, comment on S&P 500 at ${current_price:,.0f}, {day_change:+.2f}% today, {from_high:.1f}% from 52-week high. Be insightful."
-        ai_comment = call_groq_api(prompt, max_tokens=60, temperature=0.7)
-        if ai_comment:
-            ai_comment = f"\n\n💬 <i>{ai_comment}</i>"
+        ai_response = call_groq_api(prompt, max_tokens=60, temperature=0.7)
+        if ai_response:
+            clean_response = clean_ai_content(ai_response, 150)
+            ai_comment = f"\n\n🤖 {clean_response}"
 
-    msg = f"""
-📊 <b>MARKET STATISTICS</b>
+    caption = f"""📊📊📊 <b>MARKET STATISTICS</b> 📊📊📊
 
-<b>S&P 500: ${current_price:,.2f}</b>
+━━━━━━━━━━━━━━━━━━━━━━
+
+💰 <b>S&P 500:</b> <code>${current_price:,.2f}</code>
+
+━━━━━━━━━━━━━━━━━━━━━━
 
 <b>Performance:</b>
 {day_emoji} Today: <code>{day_change:+.2f}%</code>
-📅 Week: <code>{week_change:+.2f}%</code>
-📆 Month: <code>{month_change:+.2f}%</code>
+{week_emoji} Week: <code>{week_change:+.2f}%</code>
+{month_emoji} Month: <code>{month_change:+.2f}%</code>
+
+━━━━━━━━━━━━━━━━━━━━━━
 
 <b>52-Week Range:</b>
 🔺 High: ${high_52w:,.2f} ({from_high:.1f}%)
 🔻 Low: ${low_52w:,.2f}
 {ai_comment}
 
-#MarketStats #SP500 #StockMarket
+#MarketStats #SP500 #StockMarket"""
+
+    # Send with or without image
+    if stats_image:
+        return send_telegram_photo(stats_image, caption)
+    else:
+        return send_telegram_message(caption)
+
+
+def post_market_news():
+    """Post market news update with news banner image"""
+    print("Fetching Market News...")
+
+    # Fetch news
+    news_items = []
+    if NEWS_AVAILABLE:
+        news_items = fetch_market_news(5)
+
+    # Generate news banner
+    news_image = None
+    headline = None
+    if news_items:
+        headline = news_items[0].get('title', '')
+
+    if IMAGES_AVAILABLE:
+        try:
+            print("Creating news banner...")
+            news_image = create_news_banner(headline)
+        except Exception as e:
+            print(f"News banner error: {e}")
+
+    # Build caption
+    date_str = datetime.now().strftime("%B %d, %Y • %H:%M")
+
+    if news_items:
+        caption = f"""📰📰📰 <b>MARKET NEWS UPDATE</b> 📰📰📰
+
+📅 {date_str}
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+📢 <b>Latest Headlines:</b>
+
 """
-    return send_telegram_message(msg)
+        for i, item in enumerate(news_items[:5], 1):
+            title = item.get('title', '')
+            source = item.get('source', 'News')
+
+            if any(word in title.lower() for word in ['surge', 'jump', 'rally', 'gain', 'rise', 'up', 'bull']):
+                emoji = "📈"
+            elif any(word in title.lower() for word in ['drop', 'fall', 'crash', 'down', 'bear', 'loss']):
+                emoji = "📉"
+            elif any(word in title.lower() for word in ['fed', 'rate', 'inflation', 'economy']):
+                emoji = "🏛️"
+            else:
+                emoji = "📌"
+
+            caption += f"{emoji} <b>{i}.</b> {title}\n<i>— {source}</i>\n\n"
+
+        caption += "━━━━━━━━━━━━━━━━━━━━━━\n"
+        caption += "\n#MarketNews #SP500 #StockMarket"
+
+    elif GROQ_AVAILABLE:
+        print("No news available, generating AI commentary...")
+        prompt = """Generate a brief market news update for S&P 500.
+Include: market sentiment, key factors, brief outlook.
+Use ONLY plain text with emojis. NO HTML tags. Keep under 150 words."""
+
+        ai_news = call_groq_api(prompt, max_tokens=300, temperature=0.7)
+        if ai_news:
+            clean_news = clean_ai_content(ai_news, 500)
+            caption = f"""📰📰📰 <b>MARKET UPDATE</b> 📰📰📰
+
+📅 {date_str}
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+{clean_news}
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+🤖 AI-Generated Commentary
+
+#MarketNews #SP500 #Trading"""
+        else:
+            caption = f"""📰 <b>MARKET UPDATE</b>
+
+📅 {date_str}
+
+Stay tuned for the latest market developments.
+
+#MarketNews #SP500"""
+    else:
+        caption = f"""📰 <b>MARKET UPDATE</b>
+
+📅 {date_str}
+
+Stay tuned for the latest market developments.
+
+#MarketNews #SP500"""
+
+    # Send with or without image
+    if news_image:
+        return send_telegram_photo(news_image, caption)
+    else:
+        return send_telegram_message(caption)
 
 
 # ============================================================================
@@ -484,6 +770,7 @@ def post_specific_content(content_type):
         "stats": post_ai_market_stats,
         "fact": post_ai_did_you_know,
         "insight": post_ai_market_insight,
+        "news": post_market_news,
     }
 
     if content_type in content_map:
@@ -516,7 +803,7 @@ if __name__ == "__main__":
 
         if cmd == "auto":
             post_ai_content()
-        elif cmd in ["technical", "fundamental", "quote", "history", "tip", "stats", "fact", "insight"]:
+        elif cmd in ["technical", "fundamental", "quote", "history", "tip", "stats", "fact", "insight", "news"]:
             post_specific_content(cmd)
         elif cmd == "test":
             print("\nTesting all AI content types...")
@@ -538,6 +825,7 @@ Commands:
   stats       - Market statistics + AI comment
   fact        - AI "Did you know"
   insight     - AI market insight
+  news        - Market news (Yahoo Finance + AI summary)
   test        - Test all types
   help        - Show this help
             """)
