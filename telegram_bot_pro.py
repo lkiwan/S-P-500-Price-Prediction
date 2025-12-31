@@ -343,6 +343,7 @@ Let's trade smartly today! 💪
 def post_first_signal_update():
     """
     2. First Signal Update (10:00 AM ET / 4:00 PM Morocco)
+    Only posts signal if confidence > 60%, otherwise posts "No Signal Today"
     """
     print("\n" + "="*60)
     print("Posting First Signal Update...")
@@ -351,6 +352,7 @@ def post_first_signal_update():
     date_str = format_date_display()
     prediction = get_latest_prediction()
     signal = get_latest_signal()
+    current_price = get_current_market_price()
 
     if prediction is None:
         print("No prediction data available")
@@ -360,23 +362,96 @@ def post_first_signal_update():
     confidence = prediction['confidence']
     conf_tier, conf_emoji = get_confidence_tier(confidence)
 
+    # Minimum confidence threshold
+    MIN_CONFIDENCE = 0.60
+
+    # Check if confidence is high enough
+    if confidence < MIN_CONFIDENCE:
+        print(f"Confidence {confidence*100:.1f}% < 60% - No signal today")
+
+        # Post "No Signal Today" message
+        msg = f"""
+⏸️⏸️⏸️ <b>NO SIGNAL TODAY</b> ⏸️⏸️⏸️
+
+📅 <b>S&P 500 - {date_str}</b>
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+🔍 Our AI model has analyzed the market, but the confidence level is below our 60% threshold.
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+📊 <b>Current Analysis:</b>
+
+   💰 Price: <code>${current_price:,.2f}</code>
+   🎯 Model Prediction: {direction}
+   📉 Confidence: <code>{confidence*100:.1f}%</code>
+   ⚠️ Status: <b>Below 60% minimum</b>
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+🛡️ <b>Why No Signal?</b>
+
+When confidence is below 60%, the risk/reward is not favorable. We prioritize:
+
+   ✅ Quality over quantity
+   ✅ Protecting your capital
+   ✅ Waiting for better setups
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+💡 <b>What This Means:</b>
+
+   🔸 Market conditions are unclear
+   🔸 Mixed signals from indicators
+   🔸 Better to stay on the sidelines
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+📈 <b>Today's Recommendation:</b>
+
+   🚫 No new positions today
+   👀 Watch and observe
+   ⏳ Wait for stronger setup
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+💬 <i>"The best trade is sometimes no trade at all."</i>
+
+Stay patient, stay disciplined! 💪🧘
+
+#NoSignal #RiskManagement #SP500 #Patience #Trading
+"""
+        return send_telegram_message(msg)
+
+    # Confidence >= 60% - Post the signal
+    print(f"Confidence {confidence*100:.1f}% >= 60% - Posting signal")
+
     # Determine action
     is_long = direction == "UP"
     action_emoji = "🟢" if is_long else "🔴"
     action = "BUY (LONG)" if is_long else "SELL (SHORT)"
+    trend_emoji = "📈🚀" if is_long else "📉💥"
 
     # Build message
     msg = f"""
-{action_emoji}{action_emoji}{action_emoji} <b>FIRST SIGNAL UPDATE</b> {action_emoji}{action_emoji}{action_emoji}
-<b>S&P 500 - {date_str}</b>
+{action_emoji}{action_emoji}{action_emoji} <b>TRADING SIGNAL</b> {action_emoji}{action_emoji}{action_emoji}
 
-The first signal for today is in! Based on our AI model's prediction:
+📅 <b>S&P 500 - {date_str}</b>
 
-📊 <b>SIGNAL: {action}</b>
+━━━━━━━━━━━━━━━━━━━━━━
 
-🕒 <b>Entry Price:</b> <code>${signal['entry_price']:,.2f}</code>
-🎯 <b>Direction:</b> {"UP 📈" if is_long else "DOWN 📉"}
-💪 <b>Confidence:</b> {conf_tier} {conf_emoji} ({confidence*100:.1f}%)
+🎯 <b>SIGNAL: {action}</b> {trend_emoji}
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+📊 <b>Signal Details:</b>
+
+   🕒 Entry Price: <code>${signal['entry_price']:,.2f}</code>
+   {trend_emoji} Direction: <b>{"BULLISH 📈" if is_long else "BEARISH 📉"}</b>
+   💪 Confidence: {conf_tier} {conf_emoji} <code>{confidence*100:.1f}%</code>
+
+━━━━━━━━━━━━━━━━━━━━━━
 """
 
     if signal:
@@ -384,24 +459,37 @@ The first signal for today is in! Based on our AI model's prediction:
         sl_distance = abs(signal['entry_price'] - signal['stop_loss']) / signal['entry_price'] * 100
 
         msg += f"""
-🔑 <b>Trading Levels:</b>
-   ✅ Take Profit (TP): <code>${signal['take_profit']:,.2f}</code> (+{tp_distance:.2f}%)
-   ❌ Stop Loss (SL): <code>${signal['stop_loss']:,.2f}</code> (-{sl_distance:.2f}%)
+🎯 <b>Trading Levels:</b>
+
+   ✅ Take Profit: <code>${signal['take_profit']:,.2f}</code> (+{tp_distance:.2f}%)
+   ❌ Stop Loss: <code>${signal['stop_loss']:,.2f}</code> (-{sl_distance:.2f}%)
+
    📊 Risk/Reward: <code>{signal['risk_reward']:.2f}</code>
-   💨 ATR: <code>{signal['atr']:.2f}</code> (Volatility)
+   💨 Volatility (ATR): <code>{signal['atr']:.2f}</code>
+
+━━━━━━━━━━━━━━━━━━━━━━
 """
 
     msg += f"""
 ⚠️ <b>Risk Management:</b>
-• Position size: Max 2% of portfolio
-• Use proper stop loss
-• Don't overtrade
 
-We are expecting a {"bullish" if is_long else "bearish"} move today. Be ready to take action!
+   💼 Position size: Max 2% of portfolio
+   🛑 Always use stop loss
+   🧘 Don't overtrade
 
-Next update: 12:00 PM ET (6:00 PM Morocco)
+━━━━━━━━━━━━━━━━━━━━━━
 
-#SignalUpdate #TradingSignal #SP500 #{action.split()[0]}
+🔮 <b>Outlook:</b>
+
+We are expecting a <b>{"bullish 📈" if is_long else "bearish 📉"}</b> move today!
+
+⏰ Next update: 12:00 PM ET (6:00 PM Morocco)
+
+━━━━━━━━━━━━━━━━━━━━━━
+
+💪 <i>Trade smart, manage risk!</i>
+
+#SignalUpdate #TradingSignal #SP500 #{action.split()[0]} #Trading
 """
 
     return send_telegram_message(msg)
