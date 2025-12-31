@@ -101,13 +101,13 @@ def get_unsplash_image(query="stock market trading", width=1200, height=630):
             "client_id": UNSPLASH_ACCESS_KEY
         }
 
-        response = requests.get(url, params=params, timeout=10)
+        response = requests.get(url, params=params, timeout=10, verify=False)
         if response.status_code == 200:
             data = response.json()
             image_url = data['urls']['regular']
 
             # Download image
-            img_response = requests.get(image_url, timeout=15)
+            img_response = requests.get(image_url, timeout=15, verify=False)
             if img_response.status_code == 200:
                 # Resize image
                 img = Image.open(io.BytesIO(img_response.content))
