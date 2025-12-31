@@ -688,8 +688,6 @@ Use ONLY plain text with emojis. NO HTML tags. Keep under 150 words."""
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
-🤖 AI-Generated Commentary
-
 #MarketNews #SP500 #Trading"""
         else:
             caption = f"""📰 <b>MARKET UPDATE</b>
